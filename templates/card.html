@@ -54,11 +54,13 @@
   }
   console.log('✅ Square SDK cargado correctamente');
 
+  let card; // ✅ Declarar card en scope global
+  
   try {
     console.log('🔧 Inicializando Square Payments...');
     const payments = window.Square.payments(applicationId, locationId);
     console.log('💳 Creando card element...');
-    const card = await payments.card();
+    card = await payments.card(); // ✅ Asignar sin const
     console.log('🔗 Attachando card al DOM...');
     await card.attach('#card-container');
     console.log('✅ Card element listo');
@@ -69,6 +71,7 @@
   }
 
   async function tokenize(){ 
+    if (!card) throw new Error('Card element no inicializado');
     const { status, nonce, errors } = await card.tokenize();
     if(status!=='OK') throw new Error(errors?.[0]?.message||'Tokenización fallida');
     return nonce;
