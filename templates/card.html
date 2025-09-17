@@ -70,7 +70,7 @@
           body: JSON.stringify({ source_id: nonce, customer_id: customerId })});
       } else {
         res = await fetch('/api/payments',{method:'POST',headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ nonce: nonce, amount_cents: amount, currency: currency, note: note })});
+          body: JSON.stringify({ source_id: nonce, amount_cents: amount, currency: currency, note: note })});
       }
       const json = await res.json();
       postToApp(json);

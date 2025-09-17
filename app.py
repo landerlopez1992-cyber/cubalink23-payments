@@ -77,7 +77,7 @@ def api_payments():
     amount = data.get("amount_cents")
     currency = data.get("currency", "USD")
     note = data.get("note", "")
-    source_id = data.get("nonce") or data.get("source_id")
+    source_id = data.get("source_id") or data.get("nonce")
     customer_id = data.get("customer_id")
     card_id = data.get("card_id")
 
