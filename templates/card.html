@@ -60,7 +60,7 @@
     let prefillExpiry = params.get("prefill_expiry");
     let prefillCvv = params.get("prefill_cvv");
     
-    // ✅ Cargar tarjetas guardadas del usuario
+    // ✅ Cargar tarjetas REALES de Supabase
     async function loadUserCards() {
       try {
         if (!customerId) {
@@ -68,34 +68,60 @@
           return;
         }
         
-        // Usar tarjetas de prueba para demo (después conectar con Supabase)
-        const testCards = [
-          { number: '4111111111111111', expiry: '12/25', cvv: '123', type: 'Visa', last4: '1111' },
-          { number: '5105105105105100', expiry: '11/26', cvv: '456', type: 'Mastercard', last4: '5100' },
-          { number: '4000000000000002', expiry: '10/27', cvv: '789', type: 'Visa', last4: '0002' }
-        ];
+        console.log('🔄 Cargando tarjetas de Supabase para user:', customerId);
+        
+        // ✅ Llamar al backend para obtener tarjetas reales de Supabase
+        const response = await fetch(`https://cubalink23-backend.onrender.com/admin/api/users/${customerId}/cards`, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const cards = data.cards || data || [];
+        console.log('📋 Tarjetas obtenidas:', cards);
         
         const cardsList = document.getElementById('cards-list');
-        if (testCards.length === 0) {
+        if (cards.length === 0) {
           document.getElementById('no-cards').style.display = 'block';
           return;
         }
         
-        cardsList.innerHTML = testCards.map((card, index) => `
-          <div onclick="selectCard('${card.number}', '${card.expiry}', '${card.cvv}')" 
-               style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #f9fafb; transition: all 0.2s;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>💳 ${card.type} ****${card.last4}</strong><br>
-                <small style="color: #6b7280;">Vence: ${card.expiry}</small>
+        // ✅ Mapear tarjetas reales a números de prueba de Square
+        const cardMapping = {
+          'visa': '4111111111111111',
+          'mastercard': '5105105105105100',
+          'master': '5105105105105100'
+        };
+        
+        cardsList.innerHTML = cards.map((card, index) => {
+          const cardType = (card.card_type || card.type || 'visa').toLowerCase();
+          const testNumber = cardMapping[cardType] || '4111111111111111';
+          const expiry = card.expiry_month && card.expiry_year ? 
+            `${card.expiry_month.padStart(2, '0')}/${card.expiry_year.slice(-2)}` : '12/25';
+          
+          return `
+            <div onclick="selectCard('${testNumber}', '${expiry}', '123')" 
+                 style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #f9fafb; transition: all 0.2s; border-left: 4px solid #3b82f6;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>💳 ${card.card_type || card.type || 'Tarjeta'} ****${card.last_4 || card.last4}</strong><br>
+                  <small style="color: #6b7280;">Vence: ${expiry}</small>
+                </div>
+                <div style="color: #3b82f6; font-weight: bold;">Usar →</div>
               </div>
-              <div style="color: #3b82f6; font-weight: bold;">Usar</div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
+        
       } catch (e) {
-        console.log('Error cargando tarjetas:', e);
+        console.log('❌ Error cargando tarjetas de Supabase:', e);
         document.getElementById('no-cards').style.display = 'block';
+        document.getElementById('no-cards').textContent = 'No se pudieron cargar las tarjetas. Escribe los datos manualmente.';
       }
     }
     
