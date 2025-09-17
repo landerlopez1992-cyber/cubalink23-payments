@@ -41,7 +41,8 @@ print(f"🔍 DEBUG - Environment: {SQUARE_ENVIRONMENT}")
 square_client = None
 if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
-        square_client = Square(
+        # Usar la sintaxis correcta según la documentación oficial de Square
+        square_client = Client(
             access_token=SQUARE_ACCESS_TOKEN,
             environment=SQUARE_ENVIRONMENT
         )
