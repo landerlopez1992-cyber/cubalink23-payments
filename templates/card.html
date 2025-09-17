@@ -89,12 +89,28 @@
         const data = await res.json();
         if (!res.ok) throw new Error(JSON.stringify(data, null, 2));
 
-        // Muestra estado real devuelto por Square a través del backend
-        const status = data?.payment?.status || 'UNKNOWN';
-        show(`Pago ${status}\n\n${JSON.stringify(data, null, 2)}`, status === 'COMPLETED');
+        // ✅ Enviar resultado a Flutter y cerrar WebView
+        const payment = data.payment;
+        const status = payment?.status || 'UNKNOWN';
+        const result = {
+          status: status,
+          success: status === 'COMPLETED',
+          payment_id: payment?.id,
+          receipt_url: payment?.receipt_url,
+          amount: payment?.amount_money?.amount,
+          last4: payment?.card_details?.card?.last_4,
+          message: status === 'COMPLETED' ? 'Pago procesado exitosamente' : 'Pago fallido'
+        };
 
-        // (Opcional) notificar a la app contenedora con postMessage
-        // window.ReactNativeWebView?.postMessage(JSON.stringify({type:'payment_result', data}));
+        // Enviar a Flutter
+        if (window.ReactNativeWebView?.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type:'payment_result', data: result}));
+        } else if (window.webkit?.messageHandlers?.ReactNativeWebView) {
+          window.webkit.messageHandlers.ReactNativeWebView.postMessage(JSON.stringify({type:'payment_result', data: result}));
+        } else {
+          // Fallback - mostrar en WebView
+          show(`Pago ${status}\n\nID: ${payment?.id}\nMonto: $${(payment?.amount_money?.amount || 0) / 100}`, status === 'COMPLETED');
+        }
       } catch (err) {
         show(String(err), false);
       }
