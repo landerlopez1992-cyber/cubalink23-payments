@@ -86,7 +86,8 @@ def api_payments():
         return fail("MISSING_SOURCE", "source_id o card_id requerido")
 
     if source_id:
-        if source_id == "[redacted]" or not source_id.startswith("cnon:"):
+        # Solo rechazar placeholders obvios, permitir nonces reales
+        if source_id == "[redacted]" or source_id == "fake-nonce" or len(source_id) < 10:
             return fail("MISSING_NONCE", "Nonce inválido o placeholder")
 
     if not amount or amount <= 0:
