@@ -40,6 +40,11 @@
     const amount = parseInt(params.get("amount") || "100", 10);
     const currency = (params.get("currency") || "USD").toUpperCase();
     const note = params.get("note") || "Test payment";
+    
+    // ✅ Datos para pre-llenar
+    const prefillNumber = params.get("prefill_number");
+    const prefillExpiry = params.get("prefill_expiry");
+    const prefillCvv = params.get("prefill_cvv");
 
     const out = document.getElementById('out');
     const msg = document.getElementById('msg');
@@ -56,6 +61,35 @@
         card = await payments.card();
         await card.attach('#card-container');
         out.textContent = `Monto: ${amount} ${currency}`;
+        
+        // ✅ Pre-llenar datos si se proporcionan
+        if (prefillNumber || prefillExpiry || prefillCvv) {
+          setTimeout(() => {
+            try {
+              // Buscar campos del formulario Square y pre-llenarlos
+              const numberField = document.querySelector('input[name="cardNumber"], input[placeholder*="number"], input[aria-label*="Number"]');
+              const expiryField = document.querySelector('input[name="expirationDate"], input[placeholder*="MM/YY"], input[aria-label*="Expiration"]');
+              const cvvField = document.querySelector('input[name="cvv"], input[placeholder*="CVV"], input[aria-label*="CVV"]');
+              
+              if (numberField && prefillNumber) {
+                numberField.value = prefillNumber;
+                numberField.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              if (expiryField && prefillExpiry) {
+                expiryField.value = prefillExpiry;
+                expiryField.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              if (cvvField && prefillCvv) {
+                cvvField.value = prefillCvv;
+                cvvField.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              
+              console.log('✅ Datos pre-llenados:', {number: !!prefillNumber, expiry: !!prefillExpiry, cvv: !!prefillCvv});
+            } catch (e) {
+              console.log('⚠️ Error pre-llenando:', e);
+            }
+          }, 1000); // Esperar a que se cargue completamente
+        }
       } catch (e) {
         show('Error inicializando Square: ' + (e.message || e), false);
       }
