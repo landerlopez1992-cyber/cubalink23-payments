@@ -260,7 +260,6 @@ def charge_saved_card():
             return jsonify({"error": "card_id y amount son requeridos"}), 400
 
         # Crear pago con tarjeta guardada
-        payments_api = square_client.payments
         body = {
             "source_id": f"cnon:{card_id}",
             "idempotency_key": idempotency_key,
@@ -273,7 +272,7 @@ def charge_saved_card():
 
         print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
 
-        response = payments_api.create_payment(body)
+        response = square_client.payments.create_payment(body)
 
         if response.is_success():
             payment_data = response.body['payment']
