@@ -36,7 +36,7 @@ print(f"🌍 Entorno: {SQUARE_ENVIRONMENT.upper()}")
 square_client = None
 if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
-        square_client = Square(
+        square_client = Client(
             access_token=SQUARE_ACCESS_TOKEN,
             environment=SQUARE_ENVIRONMENT
         )
