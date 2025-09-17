@@ -112,6 +112,20 @@ def process_payment():
         if not card_number or not card_expiry or not card_cvv or not amount:
             return jsonify({"error": "card_number, card_expiry, card_cvv y amount son requeridos"}), 400
 
+        # Validar formato de fecha de vencimiento
+        if '/' not in card_expiry:
+            return jsonify({"error": "Formato de fecha de vencimiento inválido. Use MM/YY"}), 400
+        
+        exp_parts = card_expiry.split('/')
+        if len(exp_parts) != 2:
+            return jsonify({"error": "Formato de fecha de vencimiento inválido. Use MM/YY"}), 400
+        
+        try:
+            exp_month = int(exp_parts[0])
+            exp_year = int(exp_parts[1])
+        except ValueError:
+            return jsonify({"error": "Formato de fecha de vencimiento inválido. Use MM/YY"}), 400
+
         # Crear pago con Square usando datos de tarjeta
         body = {
             "source_id": f"cnon:card-nonce-ok",  # Nonce de prueba de Square
@@ -124,8 +138,8 @@ def process_payment():
             "card_details": {
                 "card": {
                     "card_number": card_number,
-                    "exp_month": int(card_expiry.split('/')[0]),
-                    "exp_year": int(card_expiry.split('/')[1]),
+                    "exp_month": exp_month,
+                    "exp_year": exp_year,
                     "cvv": card_cvv,
                     "postal_code": card_postal_code
                 }
