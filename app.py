@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from square_client import (
     ensure_config_ok, create_customer, create_card_on_file,
@@ -20,6 +20,16 @@ def health():
     ok, meta = ensure_config_ok()
     return {"ok": True, "square_ready": ok, **meta}
 
+@app.get("/sdk/card")
+def sdk_card():
+    """Servir HTML con Square Web Payments SDK para tokenización"""
+    try:
+        with open('templates/card.html', 'r') as f:
+            html_content = f.read()
+        return html_content, 200, {'Content-Type': 'text/html'}
+    except FileNotFoundError:
+        return jsonify({"error": "Card HTML not found"}), 404
+
 @app.post("/api/customers")
 def api_customers():
     if (k := require_key()): return k
@@ -33,6 +43,28 @@ def api_cards():
     data = request.get_json() or {}
     card = create_card_on_file(data["customer_id"], data["nonce"])  # nonce viene del cliente
     return jsonify(card), 200
+
+@app.post("/api/cards/save")
+def api_cards_save():
+    """Guardar tarjeta con nonce desde WebView"""
+    data = request.get_json() or {}
+    source_id = data.get("source_id")
+    customer_id = data.get("customer_id")
+    
+    if not source_id or not customer_id:
+        return jsonify({"error": "source_id y customer_id requeridos"}), 400
+    
+    try:
+        card = create_card_on_file(customer_id, source_id)
+        return jsonify({
+            "card_id": card["id"],
+            "brand": card["card_brand"],
+            "last4": card["last_4"],
+            "exp_month": card["exp_month"],
+            "exp_year": card["exp_year"]
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.post("/api/payments")
 def api_payments():
@@ -48,6 +80,37 @@ def api_payments():
             return jsonify(p), p.get("status_code", 400)
         return jsonify(p), 200
     return jsonify({"error":"Provide {customer_id,card_id} or {nonce}"}), 400
+
+@app.post("/api/payments/charge-onfile")
+def api_payments_charge_onfile():
+    """Cobrar tarjeta guardada (Card on File)"""
+    data = request.get_json() or {}
+    customer_id = data.get("customer_id")
+    card_id = data.get("card_id")
+    amount_money = data.get("amount_money", {})
+    note = data.get("note", "CubaLink23")
+    
+    if not customer_id or not card_id or not amount_money:
+        return jsonify({"error": "customer_id, card_id y amount_money requeridos"}), 400
+    
+    try:
+        amount_cents = amount_money.get("amount", 0)
+        currency = amount_money.get("currency", "USD")
+        
+        payment = create_payment_with_card(customer_id, card_id, amount_cents, currency, note)
+        
+        return jsonify({
+            "status": payment["status"],
+            "payment_id": payment["id"],
+            "receipt_url": payment.get("receipt_url"),
+            "message": "Pago procesado exitosamente"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "FAILED",
+            "code": "PAYMENT_ERROR", 
+            "message": str(e)
+        }), 400
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CubaLink23 – Pago</title>
+<script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
+<style>
+  body{margin:0;background:#f6f7fb;font-family:system-ui}
+  .wrap{max-width:420px;margin:20px auto;padding:16px}
+  .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 8px 26px rgba(0,0,0,.08)}
+  .btn{width:100%;padding:14px;border:0;border-radius:12px;background:#5a67d8;color:#fff;font-weight:700}
+  #msg{color:#666;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h3 style="margin:0 0 12px">Datos de tarjeta</h3>
+    <div id="card-container"></div>
+    <div id="msg"></div>
+    <button id="payBtn" class="btn">Continuar</button>
+  </div>
+</div>
+<script>
+(async () => {
+  const qs = new URLSearchParams(location.search);
+  const mode = qs.get('mode') || 'save'; // 'save'|'pay'
+  const amount = Number(qs.get('amount') || 100);
+  const currency = qs.get('currency') || 'USD';
+  const note = qs.get('note') || 'CubaLink23';
+  const customerId = qs.get('customer_id'); // para save
+  const applicationId = 'sandbox-sq0idb-IsIJtKqx2OHdVJjYmg6puA';
+  const locationId = 'LZVTP0YQ9YQBB';
+
+  function postToApp(data){
+    const payload = JSON.stringify({ type:'paymentResult', data });
+    window.ReactNativeWebView?.postMessage?.(payload);
+    window.flutter_inappwebview?.callHandler?.('paymentResult', data);
+    // Para Flutter WebView
+    if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+      window.flutter_inappwebview.callHandler('paymentResult', data);
+    } else if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(payload);
+    } else {
+      // Fallback para otros WebViews
+      window.parent.postMessage(payload, '*');
+    }
+  }
+
+  if(!window.Square){ document.getElementById('msg').textContent='No cargó Square SDK'; return;}
+
+  const payments = window.Square.payments(applicationId, locationId);
+  const card = await payments.card();
+  await card.attach('#card-container');
+
+  async function tokenize(){ 
+    const { status, nonce, errors } = await card.tokenize();
+    if(status!=='OK') throw new Error(errors?.[0]?.message||'Tokenización fallida');
+    return nonce;
+  }
+
+  document.getElementById('payBtn').onclick = async () => {
+    const btn = document.getElementById('payBtn');
+    const msg = document.getElementById('msg');
+    btn.disabled=true; msg.textContent='Procesando…';
+    try {
+      const nonce = await tokenize();
+      let res;
+      if (mode==='save') {
+        res = await fetch('/api/cards/save',{method:'POST',headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ source_id: nonce, customer_id: customerId })});
+      } else {
+        res = await fetch('/api/payments',{method:'POST',headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ nonce: nonce, amount_cents: amount, currency: currency, note: note })});
+      }
+      const json = await res.json();
+      postToApp(json);
+      msg.textContent = (json.status==='COMPLETED' || json.card_id) ? 'Listo ✅' : ('Error ❌ ' + (json.code||''));      
+    } catch(e){
+      const err={status:'FAILED',code:'TOKENIZE_ERROR',message:e.message};
+      postToApp(err);
+      msg.textContent='Error: '+e.message;
+      btn.disabled=false;
+    }
+  };
+})();
+</script>
+</body></html>
