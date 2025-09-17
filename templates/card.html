@@ -23,21 +23,22 @@
   <div class="card">
     <h1>🔒 Pago Final</h1>
     <p style="color: #6b7280; margin: 0 0 16px;">Confirma tu método de pago</p>
+    
+    <!-- Formulario Square -->
     <div id="card-container"></div>
-    <button id="pay" class="primary">🔒 Confirmar Pago</button>
-    <div id="out" class="muted"></div>
-    <div id="msg" class="msg" style="display:none"></div>
-  </div>
-
-  <!-- ✅ Cortina de selección de tarjetas -->
-  <div id="card-selector" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-    <div style="position: absolute; bottom: 0; left: 0; right: 0; background: white; border-radius: 16px 16px 0 0; padding: 20px; max-height: 70vh; overflow-y: auto;">
-      <h3 style="margin: 0 0 16px; text-align: center;">💳 Selecciona tu tarjeta</h3>
-      <div id="cards-list"></div>
-      <button onclick="closeCardSelector()" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #f5f5f5; margin-top: 16px;">
-        Cancelar
-      </button>
+    
+    <!-- ✅ Tarjetas guardadas DEBAJO del formulario -->
+    <div id="saved-cards" style="margin-top: 20px;">
+      <h3 style="font-size: 16px; margin: 0 0 12px; color: #374151;">💳 Tus tarjetas guardadas:</h3>
+      <div id="cards-list" style="margin-bottom: 16px;"></div>
+      <p id="no-cards" style="color: #6b7280; font-size: 14px; font-style: italic; display: none;">
+        No tienes tarjetas guardadas. Escribe los datos arriba o agrega una tarjeta.
+      </p>
     </div>
+    
+    <div id="out" class="muted"></div>
+    <button id="pay" class="primary">🔒 Confirmar Pago</button>
+    <div id="msg" class="msg" style="display:none"></div>
   </div>
 
   <script>
@@ -59,41 +60,96 @@
     let prefillExpiry = params.get("prefill_expiry");
     let prefillCvv = params.get("prefill_cvv");
     
-    // ✅ Funciones para cortina de selección
-    function showCardSelector() {
-      document.getElementById('card-selector').style.display = 'block';
-      loadUserCards();
-    }
-    
-    function closeCardSelector() {
-      document.getElementById('card-selector').style.display = 'none';
-    }
-    
+    // ✅ Cargar tarjetas guardadas del usuario
     async function loadUserCards() {
       try {
-        const response = await fetch(`/api/cards/list?customer_id=${customerId}`);
-        const data = await response.json();
-        const cards = data.cards || [];
+        if (!customerId) {
+          document.getElementById('no-cards').style.display = 'block';
+          return;
+        }
+        
+        // Usar tarjetas de prueba para demo (después conectar con Supabase)
+        const testCards = [
+          { number: '4111111111111111', expiry: '12/25', cvv: '123', type: 'Visa', last4: '1111' },
+          { number: '5105105105105100', expiry: '11/26', cvv: '456', type: 'Mastercard', last4: '5100' },
+          { number: '4000000000000002', expiry: '10/27', cvv: '789', type: 'Visa', last4: '0002' }
+        ];
         
         const cardsList = document.getElementById('cards-list');
-        cardsList.innerHTML = cards.map(card => `
+        if (testCards.length === 0) {
+          document.getElementById('no-cards').style.display = 'block';
+          return;
+        }
+        
+        cardsList.innerHTML = testCards.map((card, index) => `
           <div onclick="selectCard('${card.number}', '${card.expiry}', '${card.cvv}')" 
-               style="padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #f9f9f9;">
-            <strong>${card.type || 'Tarjeta'} ****${card.last4}</strong><br>
-            <small>Vence: ${card.expiry}</small>
+               style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #f9fafb; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>💳 ${card.type} ****${card.last4}</strong><br>
+                <small style="color: #6b7280;">Vence: ${card.expiry}</small>
+              </div>
+              <div style="color: #3b82f6; font-weight: bold;">Usar</div>
+            </div>
           </div>
         `).join('');
       } catch (e) {
         console.log('Error cargando tarjetas:', e);
+        document.getElementById('no-cards').style.display = 'block';
       }
     }
     
     function selectCard(number, expiry, cvv) {
-      prefillNumber = number;
-      prefillExpiry = expiry;
-      prefillCvv = cvv;
-      closeCardSelector();
-      fillSquareFields();
+      console.log('🎯 Tarjeta seleccionada:', {number, expiry, cvv});
+      fillSquareFields(number, expiry, cvv);
+    }
+    
+    // ✅ Función para llenar campos de Square
+    function fillSquareFields(number, expiry, cvv) {
+      console.log('🔄 Llenando campos Square:', {number, expiry, cvv});
+      
+      // Múltiples intentos para llenar campos
+      const attempts = [100, 500, 1000, 2000];
+      attempts.forEach(delay => {
+        setTimeout(() => {
+          try {
+            const cardContainer = document.getElementById('card-container');
+            const iframes = cardContainer.querySelectorAll('iframe');
+            
+            iframes.forEach((iframe, i) => {
+              try {
+                // Intentar diferentes métodos para acceder al iframe
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (iframeDoc) {
+                  const inputs = iframeDoc.querySelectorAll('input');
+                  console.log(`📝 Iframe ${i} - inputs encontrados:`, inputs.length);
+                  
+                  inputs.forEach((input, j) => {
+                    // Llenar según posición (0=número, 1=expiry, 2=cvv)
+                    if (j === 0 && number) {
+                      input.value = number;
+                      input.dispatchEvent(new Event('input', { bubbles: true }));
+                      console.log('✅ Número llenado');
+                    } else if (j === 1 && expiry) {
+                      input.value = expiry;
+                      input.dispatchEvent(new Event('input', { bubbles: true }));
+                      console.log('✅ Expiry llenado');
+                    } else if (j === 2 && cvv) {
+                      input.value = cvv;
+                      input.dispatchEvent(new Event('input', { bubbles: true }));
+                      console.log('✅ CVV llenado');
+                    }
+                  });
+                }
+              } catch (e) {
+                console.log(`⚠️ No se puede acceder al iframe ${i}:`, e.message);
+              }
+            });
+          } catch (e) {
+            console.log('⚠️ Error llenando campos (intento ' + delay + 'ms):', e);
+          }
+        }, delay);
+      });
     }
 
     const out = document.getElementById('out');
@@ -123,34 +179,8 @@
         await card.attach('#card-container');
         out.textContent = `Monto: $${(amount / 100).toFixed(2)} ${currency}`; // ✅ Convertir centavos a dólares
         
-        // ✅ Detectar click en campo de número para mostrar cortina
-        setTimeout(() => {
-          const cardContainer = document.getElementById('card-container');
-          const cardNumberField = cardContainer.querySelector('iframe');
-          
-          if (cardNumberField) {
-            // Agregar overlay invisible para detectar clicks
-            const overlay = document.createElement('div');
-            overlay.style.cssText = `
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 100%;
-              height: 40px;
-              background: transparent;
-              cursor: pointer;
-              z-index: 10;
-            `;
-            
-            overlay.onclick = () => {
-              console.log('🎯 Click en campo de tarjeta - abriendo selector');
-              showCardSelector();
-            };
-            
-            cardContainer.style.position = 'relative';
-            cardContainer.appendChild(overlay);
-          }
-        }, 1500);
+        // ✅ Cargar tarjetas guardadas automáticamente
+        await loadUserCards();
         
         // ✅ AUTO-LLENAR campos de Square después de que se cargue
         if (prefillNumber || prefillExpiry || prefillCvv) {
