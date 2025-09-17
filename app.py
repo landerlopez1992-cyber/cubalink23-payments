@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from square.client import Client
 
 app = Flask(__name__)
 CORS(app)
