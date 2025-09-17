@@ -17,11 +17,16 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE") or os.getenv("SUPABASE_KEY")
 
 supabase: Client = None
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    print(f"✅ Supabase conectado: {SUPABASE_URL[:50]}...")
-else:
-    print("⚠️ Supabase no configurado - algunos endpoints no funcionarán")
+try:
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        print(f"✅ Supabase conectado: {SUPABASE_URL[:50]}...")
+    else:
+        print("⚠️ Supabase no configurado - algunos endpoints no funcionarán")
+except Exception as e:
+    print(f"❌ Error conectando Supabase: {e}")
+    print("⚠️ Continuando sin Supabase - algunos endpoints no funcionarán")
+    supabase = None
 
 def require_key():
     if API_KEY and request.headers.get("X-Api-Key") != API_KEY:
