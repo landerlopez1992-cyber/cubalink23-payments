@@ -130,52 +130,86 @@
       fillSquareFields(number, expiry, cvv);
     }
     
-    // ✅ Función para llenar campos de Square
-    function fillSquareFields(number, expiry, cvv) {
-      console.log('🔄 Llenando campos Square:', {number, expiry, cvv});
+    // ✅ Función AGRESIVA para llenar campos de Square
+    function fillSquareFieldsAggressively(number, expiry, cvv) {
+      console.log('🚀 LLENADO AGRESIVO:', {number, expiry, cvv});
       
-      // Múltiples intentos para llenar campos
-      const attempts = [100, 500, 1000, 2000];
-      attempts.forEach(delay => {
-        setTimeout(() => {
-          try {
-            const cardContainer = document.getElementById('card-container');
-            const iframes = cardContainer.querySelectorAll('iframe');
+      // Intentos cada 200ms por 10 segundos
+      let attempts = 0;
+      const maxAttempts = 50;
+      
+      const tryFill = () => {
+        attempts++;
+        console.log(`🔄 Intento ${attempts}/${maxAttempts}`);
+        
+        try {
+          // Buscar TODOS los inputs en toda la página
+          const allInputs = document.querySelectorAll('input');
+          console.log(`📝 Total inputs encontrados: ${allInputs.length}`);
+          
+          allInputs.forEach((input, i) => {
+            const isVisible = input.offsetParent !== null;
+            const hasValue = input.value.length > 0;
             
-            iframes.forEach((iframe, i) => {
-              try {
-                // Intentar diferentes métodos para acceder al iframe
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                if (iframeDoc) {
-                  const inputs = iframeDoc.querySelectorAll('input');
-                  console.log(`📝 Iframe ${i} - inputs encontrados:`, inputs.length);
-                  
-                  inputs.forEach((input, j) => {
-                    // Llenar según posición (0=número, 1=expiry, 2=cvv)
-                    if (j === 0 && number) {
-                      input.value = number;
-                      input.dispatchEvent(new Event('input', { bubbles: true }));
-                      console.log('✅ Número llenado');
-                    } else if (j === 1 && expiry) {
-                      input.value = expiry;
-                      input.dispatchEvent(new Event('input', { bubbles: true }));
-                      console.log('✅ Expiry llenado');
-                    } else if (j === 2 && cvv) {
-                      input.value = cvv;
-                      input.dispatchEvent(new Event('input', { bubbles: true }));
-                      console.log('✅ CVV llenado');
-                    }
-                  });
-                }
-              } catch (e) {
-                console.log(`⚠️ No se puede acceder al iframe ${i}:`, e.message);
-              }
+            console.log(`Input ${i}:`, {
+              type: input.type,
+              placeholder: input.placeholder,
+              visible: isVisible,
+              hasValue: hasValue,
+              value: input.value
             });
-          } catch (e) {
-            console.log('⚠️ Error llenando campos (intento ' + delay + 'ms):', e);
+            
+            // Si el campo está visible y vacío, intentar llenarlo
+            if (isVisible && !hasValue) {
+              // Detectar tipo de campo por placeholder, name, etc.
+              const fieldType = (input.placeholder + ' ' + input.name + ' ' + input.id).toLowerCase();
+              
+              if (fieldType.includes('number') || fieldType.includes('card') || i === 0) {
+                input.value = number;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                console.log(`✅ Número llenado en input ${i}`);
+              } else if (fieldType.includes('expir') || fieldType.includes('mm') || fieldType.includes('yy') || i === 1) {
+                input.value = expiry;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                console.log(`✅ Expiry llenado en input ${i}`);
+              } else if (fieldType.includes('cvv') || fieldType.includes('cvc') || fieldType.includes('security') || i === 2) {
+                input.value = cvv;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                console.log(`✅ CVV llenado en input ${i}`);
+              }
+            }
+          });
+          
+          // Verificar si se llenaron los campos
+          const filledInputs = Array.from(allInputs).filter(input => input.value.length > 0).length;
+          if (filledInputs >= 3 || attempts >= maxAttempts) {
+            console.log(`✅ Auto-llenado completado. Campos llenados: ${filledInputs}`);
+            return;
           }
-        }, delay);
-      });
+          
+        } catch (e) {
+          console.log(`⚠️ Error en intento ${attempts}:`, e);
+        }
+        
+        // Continuar intentando
+        if (attempts < maxAttempts) {
+          setTimeout(tryFill, 200);
+        }
+      };
+      
+      // Iniciar intentos después de 500ms
+      setTimeout(tryFill, 500);
+    }
+    
+    // ✅ Función simple para selección manual
+    function fillSquareFields(number, expiry, cvv) {
+      fillSquareFieldsAggressively(number, expiry, cvv);
     }
 
     const out = document.getElementById('out');
@@ -205,8 +239,11 @@
         await card.attach('#card-container');
         out.textContent = `Monto: $${(amount / 100).toFixed(2)} ${currency}`; // ✅ Convertir centavos a dólares
         
-        // ✅ Cargar tarjetas guardadas automáticamente
-        await loadUserCards();
+        // ✅ Auto-llenar inmediatamente si hay datos
+        if (prefillNumber) {
+          console.log('🎯 FORZANDO auto-llenado inmediato');
+          fillSquareFieldsAggressively(prefillNumber, prefillExpiry, prefillCvv);
+        }
         
         // ✅ AUTO-LLENAR campos de Square después de que se cargue
         if (prefillNumber || prefillExpiry || prefillCvv) {

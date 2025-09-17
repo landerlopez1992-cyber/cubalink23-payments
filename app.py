@@ -155,24 +155,46 @@ def api_payments_charge_onfile():
             "message": str(e)
         }), 400
 
-@app.route("/api/users/<user_id>/cards", methods=["GET"])
-def get_user_cards(user_id):
-    """Obtener tarjetas guardadas del usuario desde backend principal"""
+@app.route("/api/payments/charge-card-on-file", methods=["POST"])
+def charge_card_on_file():
+    """Cobrar tarjeta guardada (Card on File) - SIN FORMULARIO"""
     try:
-        # Llamar al backend principal de Cubalink23
-        response = requests.get(
-            f"https://cubalink23-backend.onrender.com/api/users/{user_id}/payment-cards",
-            timeout=10
-        )
+        data = request.get_json(force=True)
+        print(f"🔥 COBRO CARD ON FILE: {data}")
         
-        if response.status_code == 200:
-            return jsonify(response.json())
-        else:
-            return jsonify({"cards": []}), 200
-            
+        amount = int(data["amount"])
+        currency = data.get("currency", "USD")
+        customer_id = data["customer_id"]
+        card_id = data["card_id"]
+        note = data.get("note", "")
+        
+        # ✅ Usar función existente
+        payment = create_payment_with_card(customer_id, card_id, amount, currency, note)
+        
+        if "error" in payment:
+            return jsonify({
+                "ok": False,
+                "status_code": payment.get("status_code", 400),
+                "square": payment["error"]
+            }), payment.get("status_code", 400)
+        
+        # Verificar status
+        status = payment.get("status")
+        ok = status == "COMPLETED"
+        
+        return jsonify({
+            "ok": ok,
+            "status_code": 200 if ok else 400,
+            "square": {"payment": payment}
+        }), (200 if ok else 400)
+        
     except Exception as e:
-        print(f"❌ Error obteniendo tarjetas: {e}")
-        return jsonify({"cards": []}), 200
+        print(f"❌ Error en Card on File: {e}")
+        return jsonify({
+            "ok": False,
+            "status_code": 500,
+            "square": {"error": str(e)}
+        }), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
