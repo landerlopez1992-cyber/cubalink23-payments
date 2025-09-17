@@ -87,29 +87,47 @@
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(JSON.stringify(data, null, 2));
+        
+        // ✅ Manejar TANTO éxito como error de Square
+        let payment, status, result;
+        
+        if (res.ok && data.payment) {
+          // Pago exitoso
+          payment = data.payment;
+          status = payment.status || 'COMPLETED';
+          result = {
+            status: status,
+            success: status === 'COMPLETED',
+            payment_id: payment.id,
+            receipt_url: payment.receipt_url,
+            amount: payment.amount_money?.amount,
+            last4: payment.card_details?.card?.last_4,
+            message: 'Pago procesado exitosamente'
+          };
+        } else {
+          // Error de Square (declined, etc.)
+          const errorData = data.message ? JSON.parse(data.message) : data;
+          payment = errorData.payment;
+          status = payment?.status || 'FAILED';
+          result = {
+            status: 'FAILED',
+            success: false,
+            payment_id: payment?.id,
+            amount: payment?.amount_money?.amount,
+            last4: payment?.card_details?.card?.last_4,
+            message: data.code === 'GENERIC_DECLINE' ? 'Tarjeta declinada' : 'Pago fallido',
+            error_code: data.code
+          };
+        }
 
-        // ✅ Enviar resultado a Flutter y cerrar WebView
-        const payment = data.payment;
-        const status = payment?.status || 'UNKNOWN';
-        const result = {
-          status: status,
-          success: status === 'COMPLETED',
-          payment_id: payment?.id,
-          receipt_url: payment?.receipt_url,
-          amount: payment?.amount_money?.amount,
-          last4: payment?.card_details?.card?.last_4,
-          message: status === 'COMPLETED' ? 'Pago procesado exitosamente' : 'Pago fallido'
-        };
-
-        // Enviar a Flutter
+        // ✅ SIEMPRE enviar a Flutter (éxito Y error)
         if (window.ReactNativeWebView?.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type:'payment_result', data: result}));
         } else if (window.webkit?.messageHandlers?.ReactNativeWebView) {
           window.webkit.messageHandlers.ReactNativeWebView.postMessage(JSON.stringify({type:'payment_result', data: result}));
         } else {
           // Fallback - mostrar en WebView
-          show(`Pago ${status}\n\nID: ${payment?.id}\nMonto: $${(payment?.amount_money?.amount || 0) / 100}`, status === 'COMPLETED');
+          show(`Pago ${status}\n\nID: ${payment?.id || 'N/A'}\nMonto: $${(result.amount || 0) / 100}`, result.success);
         }
       } catch (err) {
         show(String(err), false);
