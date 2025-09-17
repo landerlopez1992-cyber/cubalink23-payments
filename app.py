@@ -95,8 +95,13 @@ def api_payments():
         if source_id == "[redacted]" or source_id == "fake-nonce" or len(source_id) < 10:
             return fail("MISSING_NONCE", "Nonce inválido o placeholder")
 
-    if not amount or amount <= 0:
-        return fail("BAD_AMOUNT", "Monto inválido")
+    # Validar y convertir amount
+    try:
+        amount = int(amount) if amount else 0
+        if amount <= 0:
+            return fail("BAD_AMOUNT", "Monto debe ser mayor a 0")
+    except (ValueError, TypeError):
+        return fail("BAD_AMOUNT", f"Monto inválido: {amount}")
 
     try:
         # Dos modos: Card on File o Nonce directo
