@@ -60,7 +60,7 @@
     let prefillExpiry = params.get("prefill_expiry");
     let prefillCvv = params.get("prefill_cvv");
     
-    // ✅ Cargar tarjetas REALES de Supabase
+    // ✅ Cargar tarjetas REALES de Supabase usando el nuevo endpoint
     async function loadUserCards() {
       try {
         if (!customerId) {
@@ -68,10 +68,10 @@
           return;
         }
         
-        console.log('🔄 Cargando tarjetas de Supabase para user:', customerId);
+        console.log('🔄 Cargando tarjetas para user:', customerId);
         
-        // ✅ Llamar al endpoint local para obtener tarjetas reales de Supabase
-        const response = await fetch(`/api/users/${customerId}/cards`, {
+        // ✅ Usar el nuevo endpoint /api/cards?user_id=...
+        const response = await fetch(`/api/cards?user_id=${customerId}`, {
           headers: {
             'Content-Type': 'application/json'
           }
@@ -82,7 +82,7 @@
         }
         
         const data = await response.json();
-        const cards = data.cards || data || [];
+        const cards = data.cards || [];
         console.log('📋 Tarjetas obtenidas:', cards);
         
         const cardsList = document.getElementById('cards-list');
@@ -99,17 +99,17 @@
         };
         
         cardsList.innerHTML = cards.map((card, index) => {
-          const cardType = (card.card_type || card.type || 'visa').toLowerCase();
+          const cardType = (card.brand || card.card_type || 'visa').toLowerCase();
           const testNumber = cardMapping[cardType] || '4111111111111111';
-          const expiry = card.expiry_month && card.expiry_year ? 
-            `${card.expiry_month.padStart(2, '0')}/${card.expiry_year.slice(-2)}` : '12/25';
+          const expiry = card.exp_month && card.exp_year ? 
+            `${String(card.exp_month).padStart(2, '0')}/${String(card.exp_year).slice(-2)}` : '12/25';
           
           return `
             <div onclick="selectCard('${testNumber}', '${expiry}', '123')" 
                  style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #f9fafb; transition: all 0.2s; border-left: 4px solid #3b82f6;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                  <strong>💳 ${card.card_type || card.type || 'Tarjeta'} ****${card.last_4 || card.last4}</strong><br>
+                  <strong>💳 ${card.brand || card.card_type || 'Tarjeta'} ****${card.last4}</strong><br>
                   <small style="color: #6b7280;">Vence: ${expiry}</small>
                 </div>
                 <div style="color: #3b82f6; font-weight: bold;">Usar →</div>
@@ -245,6 +245,9 @@
           fillSquareFieldsAggressively(prefillNumber, prefillExpiry, prefillCvv);
         }
         
+        // ✅ Cargar tarjetas guardadas
+        await loadUserCards();
+        
         // ✅ AUTO-LLENAR campos de Square después de que se cargue
         if (prefillNumber || prefillExpiry || prefillCvv) {
           console.log('🔄 Iniciando auto-llenado:', {number: prefillNumber, expiry: prefillExpiry, cvv: prefillCvv});
@@ -363,6 +366,33 @@
       try {
         const nonce = await tokenize();
 
+        // ✅ NUEVO: Crear tarjeta EN Square y guardar metadata en Supabase
+        if (customerId) {
+          try {
+            console.log('💾 Guardando nueva tarjeta para customer:', customerId);
+            const createRes = await fetch('/api/cards/create', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({
+                user_id: customerId,
+                customer_id: customerId, // Asumimos que customer_id = user_id por ahora
+                nonce: nonce,
+                postal_code: '12345',
+                name: 'Usuario'
+              })
+            });
+            
+            if (createRes.ok) {
+              const cardData = await createRes.json();
+              console.log('✅ Tarjeta creada y guardada:', cardData);
+            } else {
+              console.log('⚠️ No se pudo guardar la tarjeta, pero continuando con pago');
+            }
+          } catch (e) {
+            console.log('⚠️ Error guardando tarjeta:', e);
+          }
+        }
+
         // ✅ Llama a tu backend Flask en Render
         const res = await fetch('/api/payments', {
           method: 'POST',
@@ -371,7 +401,8 @@
             source_id: nonce,
             amount_cents: amount,
             currency: currency,
-            note: note
+            note: note,
+            customer_id: customerId
           })
         });
 

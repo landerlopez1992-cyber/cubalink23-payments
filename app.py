@@ -1,15 +1,27 @@
-import os, requests
+import os, requests, uuid
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from square_client import (
     ensure_config_ok, create_customer, create_card_on_file,
     create_payment_with_card, create_payment_with_nonce
 )
+from supabase import create_client, Client
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 API_KEY = os.getenv("INTERNAL_API_KEY")  # opcional
+
+# ====================== SUPABASE SETUP ======================
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE") or os.getenv("SUPABASE_KEY")
+
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    print(f"✅ Supabase conectado: {SUPABASE_URL[:50]}...")
+else:
+    print("⚠️ Supabase no configurado - algunos endpoints no funcionarán")
 
 def require_key():
     if API_KEY and request.headers.get("X-Api-Key") != API_KEY:
@@ -18,7 +30,219 @@ def require_key():
 @app.get("/health")
 def health():
     ok, meta = ensure_config_ok()
-    return {"ok": True, "square_ready": ok, **meta}
+    supabase_ready = supabase is not None
+    return {"ok": True, "square_ready": ok, "supabase_ready": supabase_ready, **meta}
+
+# ====================== ENDPOINTS CARD-ON-FILE SEGÚN AMIGO ======================
+
+@app.post("/api/square/customers/ensure")
+def ensure_square_customer():
+    """1) Crear/obtener Customer en Square y vincular en Supabase"""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+        
+    data = request.get_json() or {}
+    user_id = data.get("user_id")
+    email = data.get("email", "")
+    name = data.get("name", "")
+    
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
+    
+    try:
+        # Verificar si ya existe en Supabase
+        result = supabase.table("user_square").select("square_customer_id").eq("user_id", user_id).execute()
+        
+        if result.data:
+            # Ya existe
+            square_customer_id = result.data[0]["square_customer_id"]
+            print(f"✅ Customer existente: {square_customer_id}")
+        else:
+            # Crear nuevo customer en Square
+            customer = create_customer(given_name=name, email=email, reference_id=user_id)
+            square_customer_id = customer["id"]
+            
+            # Guardar en Supabase
+            supabase.table("user_square").insert({
+                "user_id": user_id,
+                "square_customer_id": square_customer_id
+            }).execute()
+            
+            print(f"🆕 Nuevo customer creado: {square_customer_id}")
+        
+        return jsonify({"square_customer_id": square_customer_id}), 200
+        
+    except Exception as e:
+        print(f"❌ Error ensure customer: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/cards/create")
+def create_card_with_metadata():
+    """2) Guardar tarjeta (Card-on-File) con metadata en Supabase"""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+        
+    data = request.get_json() or {}
+    user_id = data.get("user_id")
+    customer_id = data.get("customer_id")
+    nonce = data.get("nonce")
+    postal_code = data.get("postal_code", "12345")
+    name = data.get("name", "")
+    
+    if not all([user_id, customer_id, nonce]):
+        return jsonify({"error": "user_id, customer_id y nonce requeridos"}), 400
+    
+    try:
+        # Crear tarjeta EN Square
+        card = create_card_on_file(customer_id, nonce)
+        
+        if "error" in card:
+            return jsonify({"error": card["error"]}), 400
+        
+        # Verificar si es la primera tarjeta del usuario
+        existing_cards = supabase.table("payment_cards").select("id").eq("user_id", user_id).execute()
+        is_default = len(existing_cards.data) == 0
+        
+        # Guardar metadata en Supabase
+        card_data = {
+            "user_id": user_id,
+            "square_card_id": card["id"],  # ccof:...
+            "square_customer_id": customer_id,
+            "card_type": card.get("card_brand", "unknown"),
+            "last4": card.get("last_4", "****"),
+            "exp_month": card.get("exp_month"),
+            "exp_year": card.get("exp_year"),
+            "zip_code": postal_code,
+            "holder_name": name,
+            "is_default": is_default
+        }
+        
+        result = supabase.table("payment_cards").insert(card_data).execute()
+        
+        return jsonify({
+            "square_card_id": card["id"],
+            "brand": card.get("card_brand"),
+            "last4": card.get("last_4"),
+            "exp_month": card.get("exp_month"),
+            "exp_year": card.get("exp_year"),
+            "is_default": is_default,
+            "supabase_id": result.data[0]["id"] if result.data else None
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error crear tarjeta: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/cards")
+def list_user_cards():
+    """3) Listar tarjetas para el perfil"""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+        
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
+    
+    try:
+        result = supabase.table("payment_cards").select(
+            "id, square_card_id, card_type, last4, exp_month, exp_year, is_default, holder_name, created_at"
+        ).eq("user_id", user_id).order("created_at", desc=True).execute()
+        
+        cards = []
+        for card in result.data:
+            cards.append({
+                "id": card["id"],
+                "square_card_id": card["square_card_id"],
+                "brand": card["card_type"],
+                "last4": card["last4"],
+                "exp_month": card["exp_month"],
+                "exp_year": card["exp_year"],
+                "is_default": card["is_default"],
+                "holder_name": card["holder_name"],
+                "created_at": card["created_at"]
+            })
+        
+        return jsonify({"cards": cards}), 200
+        
+    except Exception as e:
+        print(f"❌ Error listar tarjetas: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.delete("/api/cards/<square_card_id>")
+def delete_user_card(square_card_id):
+    """4) Eliminar tarjeta"""
+    if not supabase:
+        return jsonify({"error": "Supabase no configurado"}), 500
+        
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
+    
+    try:
+        # TODO: Llamar a Square API para deshabilitar tarjeta
+        # requests.post(f"{base_url}/v2/cards/{square_card_id}/disable", headers=headers)
+        
+        # Eliminar de Supabase
+        result = supabase.table("payment_cards").delete().eq("square_card_id", square_card_id).eq("user_id", user_id).execute()
+        
+        if not result.data:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+        
+        return jsonify({"message": "Tarjeta eliminada exitosamente"}), 200
+        
+    except Exception as e:
+        print(f"❌ Error eliminar tarjeta: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/payments/charge")
+def charge_saved_card():
+    """5) Pagar con card-on-file (checkout 1 toque)"""
+    data = request.get_json() or {}
+    user_id = data.get("user_id")
+    amount = data.get("amount")  # centavos
+    currency = data.get("currency", "USD")
+    square_card_id = data.get("square_card_id")
+    customer_id = data.get("customer_id")  # square customer id
+    note = data.get("note", "Recarga Cubalink23")
+    
+    if not all([user_id, amount, square_card_id, customer_id]):
+        return jsonify({"error": "user_id, amount, square_card_id y customer_id requeridos"}), 400
+    
+    try:
+        # Validar que la tarjeta pertenece al usuario
+        if supabase:
+            card_check = supabase.table("payment_cards").select("id").eq("square_card_id", square_card_id).eq("user_id", user_id).execute()
+            if not card_check.data:
+                return jsonify({"error": "Tarjeta no encontrada o no autorizada"}), 403
+        
+        # Procesar pago con Square
+        payment = create_payment_with_card(customer_id, square_card_id, int(amount), currency, note)
+        
+        if "error" in payment:
+            return jsonify({
+                "status": "FAILED",
+                "error": payment["error"],
+                "status_code": payment.get("status_code", 400)
+            }), payment.get("status_code", 400)
+        
+        status = payment.get("status")
+        success = status == "COMPLETED"
+        
+        return jsonify({
+            "status": status,
+            "payment_id": payment.get("id"),
+            "receipt_url": payment.get("receipt_url"),
+            "success": success,
+            "amount": amount,
+            "currency": currency
+        }), (200 if success else 400)
+        
+    except Exception as e:
+        print(f"❌ Error pago card-on-file: {e}")
+        return jsonify({
+            "status": "FAILED",
+            "error": str(e)
+        }), 500
 
 @app.get("/sdk/card")
 def sdk_card():
