@@ -65,31 +65,81 @@
         
         // ✅ Pre-llenar datos si se proporcionan
         if (prefillNumber || prefillExpiry || prefillCvv) {
-          setTimeout(() => {
-            try {
-              // Buscar campos del formulario Square y pre-llenarlos
-              const numberField = document.querySelector('input[name="cardNumber"], input[placeholder*="number"], input[aria-label*="Number"]');
-              const expiryField = document.querySelector('input[name="expirationDate"], input[placeholder*="MM/YY"], input[aria-label*="Expiration"]');
-              const cvvField = document.querySelector('input[name="cvv"], input[placeholder*="CVV"], input[aria-label*="CVV"]');
-              
-              if (numberField && prefillNumber) {
-                numberField.value = prefillNumber;
-                numberField.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('🔄 Intentando pre-llenar:', {number: prefillNumber, expiry: prefillExpiry, cvv: prefillCvv});
+          
+          // Múltiples intentos con diferentes delays
+          const attempts = [500, 1000, 2000, 3000];
+          attempts.forEach(delay => {
+            setTimeout(() => {
+              try {
+                // Buscar TODOS los inputs posibles
+                const allInputs = document.querySelectorAll('input, iframe');
+                console.log('🔍 Inputs encontrados:', allInputs.length);
+                
+                // Intentar múltiples selectores
+                const numberSelectors = [
+                  'input[placeholder*="number"]', 'input[placeholder*="Number"]', 'input[placeholder*="NUMBER"]',
+                  'input[aria-label*="number"]', 'input[aria-label*="Number"]', 'input[aria-label*="NUMBER"]',
+                  'input[name*="card"]', 'input[name*="number"]', 'input[id*="card"]', 'input[id*="number"]',
+                  'input[type="text"]', 'input[type="tel"]'
+                ];
+                
+                const expirySelectors = [
+                  'input[placeholder*="MM"]', 'input[placeholder*="YY"]', 'input[placeholder*="expir"]',
+                  'input[aria-label*="expir"]', 'input[name*="expir"]', 'input[id*="expir"]'
+                ];
+                
+                const cvvSelectors = [
+                  'input[placeholder*="CVV"]', 'input[placeholder*="cvv"]', 'input[placeholder*="CVC"]',
+                  'input[aria-label*="cvv"]', 'input[name*="cvv"]', 'input[id*="cvv"]'
+                ];
+                
+                // Intentar llenar número
+                if (prefillNumber) {
+                  for (const selector of numberSelectors) {
+                    const field = document.querySelector(selector);
+                    if (field && !field.value) {
+                      field.value = prefillNumber;
+                      field.dispatchEvent(new Event('input', { bubbles: true }));
+                      field.dispatchEvent(new Event('change', { bubbles: true }));
+                      console.log('✅ Número llenado con selector:', selector);
+                      break;
+                    }
+                  }
+                }
+                
+                // Intentar llenar expiry
+                if (prefillExpiry) {
+                  for (const selector of expirySelectors) {
+                    const field = document.querySelector(selector);
+                    if (field && !field.value) {
+                      field.value = prefillExpiry;
+                      field.dispatchEvent(new Event('input', { bubbles: true }));
+                      field.dispatchEvent(new Event('change', { bubbles: true }));
+                      console.log('✅ Expiry llenado con selector:', selector);
+                      break;
+                    }
+                  }
+                }
+                
+                // Intentar llenar CVV
+                if (prefillCvv) {
+                  for (const selector of cvvSelectors) {
+                    const field = document.querySelector(selector);
+                    if (field && !field.value) {
+                      field.value = prefillCvv;
+                      field.dispatchEvent(new Event('input', { bubbles: true }));
+                      field.dispatchEvent(new Event('change', { bubbles: true }));
+                      console.log('✅ CVV llenado con selector:', selector);
+                      break;
+                    }
+                  }
+                }
+              } catch (e) {
+                console.log('⚠️ Error pre-llenando (intento ' + delay + 'ms):', e);
               }
-              if (expiryField && prefillExpiry) {
-                expiryField.value = prefillExpiry;
-                expiryField.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-              if (cvvField && prefillCvv) {
-                cvvField.value = prefillCvv;
-                cvvField.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-              
-              console.log('✅ Datos pre-llenados:', {number: !!prefillNumber, expiry: !!prefillExpiry, cvv: !!prefillCvv});
-            } catch (e) {
-              console.log('⚠️ Error pre-llenando:', e);
-            }
-          }, 1000); // Esperar a que se cargue completamente
+            }, delay);
+          });
         }
       } catch (e) {
         show('Error inicializando Square: ' + (e.message || e), false);
