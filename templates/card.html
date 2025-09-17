@@ -79,11 +79,10 @@
           method: 'POST',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
-            idempotency_key: crypto.randomUUID(),
-            amount_money: { amount, currency },
             source_id: nonce,
-            location_id: locationId,
-            note
+            amount_cents: amount,
+            currency: currency,
+            note: note
           })
         });
 
