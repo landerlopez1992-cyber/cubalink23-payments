@@ -1,4 +1,4 @@
-import os
+import os, requests
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from square_client import (
@@ -154,6 +154,25 @@ def api_payments_charge_onfile():
             "code": "PAYMENT_ERROR", 
             "message": str(e)
         }), 400
+
+@app.route("/api/users/<user_id>/cards", methods=["GET"])
+def get_user_cards(user_id):
+    """Obtener tarjetas guardadas del usuario desde backend principal"""
+    try:
+        # Llamar al backend principal de Cubalink23
+        response = requests.get(
+            f"https://cubalink23-backend.onrender.com/api/users/{user_id}/payment-cards",
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({"cards": []}), 200
+            
+    except Exception as e:
+        print(f"❌ Error obteniendo tarjetas: {e}")
+        return jsonify({"cards": []}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

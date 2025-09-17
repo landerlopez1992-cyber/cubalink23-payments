@@ -70,8 +70,8 @@
         
         console.log('🔄 Cargando tarjetas de Supabase para user:', customerId);
         
-        // ✅ Llamar al backend para obtener tarjetas reales de Supabase
-        const response = await fetch(`https://cubalink23-backend.onrender.com/admin/api/users/${customerId}/cards`, {
+        // ✅ Llamar al endpoint local para obtener tarjetas reales de Supabase
+        const response = await fetch(`/api/users/${customerId}/cards`, {
           headers: {
             'Content-Type': 'application/json'
           }
