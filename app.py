@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from square.client import Client
+from square.client import Square
 
 app = Flask(__name__)
 CORS(app)
@@ -37,7 +37,7 @@ print(f"🌍 Entorno: {SQUARE_ENVIRONMENT.upper()}")
 square_client = None
 if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
-        square_client = Client(
+        square_client = Square(
             access_token=SQUARE_ACCESS_TOKEN,
             environment=SQUARE_ENVIRONMENT
         )
