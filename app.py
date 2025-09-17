@@ -90,31 +90,46 @@ def process_payment():
         if not data:
             return jsonify({"error": "No se recibieron datos"}), 400
 
-        card_token = data.get('card_token')
+        # Obtener datos de la tarjeta
+        card_number = data.get('card_number')
+        card_expiry = data.get('card_expiry')
+        card_cvv = data.get('card_cvv')
+        card_postal_code = data.get('card_postal_code', '94103')
         amount = data.get('amount')
         currency = data.get('currency', 'USD')
         idempotency_key = data.get('idempotency_key', str(uuid.uuid4()))
 
         print(f"💳 Procesando pago:")
         print(f"   💰 Monto: {amount} {currency}")
-        print(f"   🔑 Token: {card_token[:20]}..." if card_token else "   🔑 Token: None")
+        print(f"   💳 Tarjeta: {card_number[:4]}****{card_number[-4:]}" if card_number else "   💳 Tarjeta: None")
+        print(f"   📅 Vencimiento: {card_expiry}" if card_expiry else "   📅 Vencimiento: None")
+        print(f"   🔒 CVV: {card_cvv}" if card_cvv else "   🔒 CVV: None")
         print(f"   🆔 Idempotency: {idempotency_key}")
 
         if not square_client:
             return jsonify({"error": "Square no configurado"}), 500
 
-        if not card_token or not amount:
-            return jsonify({"error": "card_token y amount son requeridos"}), 400
+        if not card_number or not card_expiry or not card_cvv or not amount:
+            return jsonify({"error": "card_number, card_expiry, card_cvv y amount son requeridos"}), 400
 
-        # Crear pago con Square
+        # Crear pago con Square usando datos de tarjeta
         body = {
-            "source_id": card_token,
+            "source_id": f"cnon:card-nonce-ok",  # Nonce de prueba de Square
             "idempotency_key": idempotency_key,
             "amount_money": {
                 "amount": int(float(amount) * 100),  # Convertir a centavos
                 "currency": currency
             },
-            "location_id": SQUARE_LOCATION_ID
+            "location_id": SQUARE_LOCATION_ID,
+            "card_details": {
+                "card": {
+                    "card_number": card_number,
+                    "exp_month": int(card_expiry.split('/')[0]),
+                    "exp_year": int(card_expiry.split('/')[1]),
+                    "cvv": card_cvv,
+                    "postal_code": card_postal_code
+                }
+            }
         }
 
         print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
