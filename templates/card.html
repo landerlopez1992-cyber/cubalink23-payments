@@ -61,21 +61,15 @@
       try {
         payments = window.Square.payments(appId, locationId); // ✅ inicialización oficial
         
-        // ✅ Pre-configurar card con datos si se proporcionan
-        const cardOptions = {};
-        if (prefillNumber || prefillExpiry || prefillCvv) {
-          cardOptions.style = {
+        // ✅ Configuración básica sin estilos problemáticos
+        const cardOptions = {
+          style: {
             input: {
               fontSize: '16px',
-              fontFamily: 'system-ui'
+              fontFamily: 'Arial, sans-serif' // ✅ Fuente compatible
             }
-          };
-          
-          // Intentar pre-llenar usando la API de Square
-          if (prefillNumber) {
-            console.log('🔄 Pre-llenando número:', prefillNumber);
           }
-        }
+        };
         
         card = await payments.card(cardOptions);
         await card.attach('#card-container');
