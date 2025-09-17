@@ -49,6 +49,29 @@ def health():
     supabase_ready = supabase is not None
     return {"ok": True, "square_ready": ok, "supabase_ready": supabase_ready, **meta}
 
+@app.get("/debug/users")
+def debug_users():
+    """TEMPORAL: Buscar usuarios en Supabase"""
+    if not supabase:
+        return {"error": "Supabase no configurado"}, 500
+    
+    try:
+        # Buscar usuarios que contengan "lander" en el email o nombre
+        result = supabase.table("users").select("id, email, raw_user_meta_data").limit(10).execute()
+        
+        users = []
+        for user in result.data:
+            users.append({
+                "id": user["id"],
+                "email": user.get("email", ""),
+                "name": user.get("raw_user_meta_data", {}).get("full_name", "")
+            })
+        
+        return {"users": users}
+        
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 # ====================== ENDPOINTS CARD-ON-FILE SEGÚN AMIGO ======================
 
 @app.post("/api/square/customers/ensure")
