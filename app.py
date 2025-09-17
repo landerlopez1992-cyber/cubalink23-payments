@@ -12,7 +12,8 @@ import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from square.client import client
+from square.client import Client
+from square.models import CreatePaymentRequest, Money
 
 app = Flask(__name__)
 CORS(app)
@@ -42,7 +43,7 @@ square_client = None
 if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
         # Usar la sintaxis correcta según la documentación oficial de Square
-        square_client = client(
+        square_client = Client(
             access_token=SQUARE_ACCESS_TOKEN,
             environment='sandbox'
         )
@@ -126,29 +127,21 @@ def process_payment():
         except ValueError:
             return jsonify({"error": "Formato de fecha de vencimiento inválido. Use MM/YY"}), 400
 
-        # Crear pago con Square usando datos de tarjeta
-        body = {
-            "source_id": f"cnon:card-nonce-ok",  # Nonce de prueba de Square
-            "idempotency_key": idempotency_key,
-            "amount_money": {
-                "amount": int(float(amount) * 100),  # Convertir a centavos
-                "currency": currency
-            },
-            "location_id": SQUARE_LOCATION_ID,
-            "card_details": {
-                "card": {
-                    "card_number": card_number,
-                    "exp_month": exp_month,
-                    "exp_year": exp_year,
-                    "cvv": card_cvv,
-                    "postal_code": card_postal_code
-                }
-            }
-        }
+        # Crear pago con Square usando la sintaxis correcta según documentación oficial
+        amount_money = Money(
+            amount=int(float(amount) * 100),  # Convertir a centavos
+            currency=currency
+        )
+        
+        body = CreatePaymentRequest(
+            source_id="cnon:card-nonce-ok",  # Nonce de prueba de Square
+            idempotency_key=idempotency_key,
+            amount_money=amount_money
+        )
 
-        print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
+        print(f"📤 Enviando a Square API: {amount} {currency} con idempotency {idempotency_key}")
 
-        response = square_client.payments.create_payment(body=body)
+        response = square_client.payments.create_payment(body)
 
         if response.is_success():
             payment_data = response.body['payment']
