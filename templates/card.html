@@ -46,7 +46,13 @@
     }
   }
 
-  if(!window.Square){ document.getElementById('msg').textContent='No cargó Square SDK'; return;}
+  console.log('🔍 Verificando Square SDK...');
+  if(!window.Square){ 
+    console.error('❌ Square SDK no cargado');
+    document.getElementById('msg').textContent='Error: Square SDK no cargado'; 
+    return;
+  }
+  console.log('✅ Square SDK cargado correctamente');
 
   const payments = window.Square.payments(applicationId, locationId);
   const card = await payments.card();
@@ -59,11 +65,14 @@
   }
 
   document.getElementById('payBtn').onclick = async () => {
+    console.log('🚀 Botón de pago presionado');
     const btn = document.getElementById('payBtn');
     const msg = document.getElementById('msg');
     btn.disabled=true; msg.textContent='Procesando…';
     try {
+      console.log('🔄 Iniciando tokenización...');
       const nonce = await tokenize();
+      console.log('✅ Nonce obtenido:', nonce);
       let res;
       if (mode==='save') {
         res = await fetch('/api/cards/save',{method:'POST',headers:{'Content-Type':'application/json'},
