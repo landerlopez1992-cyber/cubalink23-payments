@@ -24,6 +24,9 @@
     <h1>🔒 Pago Final</h1>
     <p style="color: #6b7280; margin: 0 0 8px;">Confirma tu método de pago seleccionado</p>
     <div id="prefill-info" style="background: #f3f4f6; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; color: #374151;"></div>
+    <button id="autofill" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; color: #374151; margin-bottom: 12px; cursor: pointer; display: none;">
+      🎯 Auto-llenar campos
+    </button>
     <div id="card-container"></div>
     <button id="pay" class="primary">🔒 Confirmar Pago</button>
     <div id="out" class="muted"></div>
@@ -77,6 +80,8 @@
         
         // ✅ Mostrar información de pre-llenado
         const prefillInfo = document.getElementById('prefill-info');
+        const autofillBtn = document.getElementById('autofill');
+        
         if (prefillNumber || prefillExpiry || prefillCvv) {
           prefillInfo.innerHTML = `
             <strong>📋 Datos de tu tarjeta seleccionada:</strong><br>
@@ -84,87 +89,111 @@
             ${prefillExpiry ? `📅 Vencimiento: ${prefillExpiry}` : ''}<br>
             ${prefillCvv ? `🔒 CVV: ${prefillCvv}` : ''}
           `;
+          autofillBtn.style.display = 'block';
         } else {
           prefillInfo.style.display = 'none';
+          autofillBtn.style.display = 'none';
         }
         
-        // ✅ Pre-llenar datos si se proporcionan
+        // ✅ AUTO-LLENAR campos de Square después de que se cargue
         if (prefillNumber || prefillExpiry || prefillCvv) {
-          console.log('🔄 Intentando pre-llenar:', {number: prefillNumber, expiry: prefillExpiry, cvv: prefillCvv});
+          console.log('🔄 Iniciando auto-llenado:', {number: prefillNumber, expiry: prefillExpiry, cvv: prefillCvv});
           
-          // Múltiples intentos con diferentes delays
-          const attempts = [500, 1000, 2000, 3000];
-          attempts.forEach(delay => {
-            setTimeout(() => {
-              try {
-                // Buscar TODOS los inputs posibles
-                const allInputs = document.querySelectorAll('input, iframe');
-                console.log('🔍 Inputs encontrados:', allInputs.length);
-                
-                // Intentar múltiples selectores
-                const numberSelectors = [
-                  'input[placeholder*="number"]', 'input[placeholder*="Number"]', 'input[placeholder*="NUMBER"]',
-                  'input[aria-label*="number"]', 'input[aria-label*="Number"]', 'input[aria-label*="NUMBER"]',
-                  'input[name*="card"]', 'input[name*="number"]', 'input[id*="card"]', 'input[id*="number"]',
-                  'input[type="text"]', 'input[type="tel"]'
-                ];
-                
-                const expirySelectors = [
-                  'input[placeholder*="MM"]', 'input[placeholder*="YY"]', 'input[placeholder*="expir"]',
-                  'input[aria-label*="expir"]', 'input[name*="expir"]', 'input[id*="expir"]'
-                ];
-                
-                const cvvSelectors = [
-                  'input[placeholder*="CVV"]', 'input[placeholder*="cvv"]', 'input[placeholder*="CVC"]',
-                  'input[aria-label*="cvv"]', 'input[name*="cvv"]', 'input[id*="cvv"]'
-                ];
-                
-                // Intentar llenar número
-                if (prefillNumber) {
-                  for (const selector of numberSelectors) {
-                    const field = document.querySelector(selector);
-                    if (field && !field.value) {
-                      field.value = prefillNumber;
-                      field.dispatchEvent(new Event('input', { bubbles: true }));
-                      field.dispatchEvent(new Event('change', { bubbles: true }));
-                      console.log('✅ Número llenado con selector:', selector);
-                      break;
+          // Función para auto-llenar con múltiples estrategias
+          const autoFill = () => {
+            try {
+              // Estrategia 1: Buscar en DOM principal
+              const cardContainer = document.getElementById('card-container');
+              const allInputs = cardContainer ? cardContainer.querySelectorAll('input') : document.querySelectorAll('input');
+              console.log('🔍 Inputs en card-container:', allInputs.length);
+              
+              allInputs.forEach((input, index) => {
+                console.log(`Input ${index}:`, {
+                  type: input.type,
+                  placeholder: input.placeholder,
+                  name: input.name,
+                  id: input.id,
+                  className: input.className
+                });
+              });
+              
+              // Estrategia 2: Usar MutationObserver para detectar iframes
+              const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                  mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) { // Element node
+                      // Buscar iframes de Square
+                      const iframes = node.querySelectorAll ? node.querySelectorAll('iframe') : [];
+                      iframes.forEach((iframe, i) => {
+                        console.log(`🔍 Iframe ${i} encontrado:`, iframe.src);
+                        
+                        // Intentar acceder al contenido del iframe (si es same-origin)
+                        try {
+                          setTimeout(() => {
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                            if (iframeDoc) {
+                              const iframeInputs = iframeDoc.querySelectorAll('input');
+                              console.log(`📝 Inputs en iframe ${i}:`, iframeInputs.length);
+                              
+                              iframeInputs.forEach((input, j) => {
+                                console.log(`Iframe ${i} Input ${j}:`, {
+                                  type: input.type,
+                                  placeholder: input.placeholder,
+                                  value: input.value
+                                });
+                                
+                                // Intentar llenar según el tipo
+                                if (input.type === 'tel' || input.placeholder?.includes('number') || j === 0) {
+                                  if (prefillNumber && !input.value) {
+                                    input.value = prefillNumber;
+                                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                                    console.log('✅ Número auto-llenado en iframe');
+                                  }
+                                } else if (input.placeholder?.includes('MM') || input.placeholder?.includes('YY') || j === 1) {
+                                  if (prefillExpiry && !input.value) {
+                                    input.value = prefillExpiry;
+                                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                                    console.log('✅ Expiry auto-llenado en iframe');
+                                  }
+                                } else if (input.placeholder?.includes('CVV') || input.placeholder?.includes('CVC') || j === 2) {
+                                  if (prefillCvv && !input.value) {
+                                    input.value = prefillCvv;
+                                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                                    console.log('✅ CVV auto-llenado en iframe');
+                                  }
+                                }
+                              });
+                            }
+                          }, 500);
+                        } catch (e) {
+                          console.log('⚠️ No se puede acceder al iframe (cross-origin):', e.message);
+                        }
+                      });
                     }
-                  }
-                }
-                
-                // Intentar llenar expiry
-                if (prefillExpiry) {
-                  for (const selector of expirySelectors) {
-                    const field = document.querySelector(selector);
-                    if (field && !field.value) {
-                      field.value = prefillExpiry;
-                      field.dispatchEvent(new Event('input', { bubbles: true }));
-                      field.dispatchEvent(new Event('change', { bubbles: true }));
-                      console.log('✅ Expiry llenado con selector:', selector);
-                      break;
-                    }
-                  }
-                }
-                
-                // Intentar llenar CVV
-                if (prefillCvv) {
-                  for (const selector of cvvSelectors) {
-                    const field = document.querySelector(selector);
-                    if (field && !field.value) {
-                      field.value = prefillCvv;
-                      field.dispatchEvent(new Event('input', { bubbles: true }));
-                      field.dispatchEvent(new Event('change', { bubbles: true }));
-                      console.log('✅ CVV llenado con selector:', selector);
-                      break;
-                    }
-                  }
-                }
-              } catch (e) {
-                console.log('⚠️ Error pre-llenando (intento ' + delay + 'ms):', e);
-              }
-            }, delay);
-          });
+                  });
+                });
+              });
+              
+              observer.observe(cardContainer || document.body, {
+                childList: true,
+                subtree: true
+              });
+              
+              // Detener observer después de 10 segundos
+              setTimeout(() => observer.disconnect(), 10000);
+              
+            } catch (e) {
+              console.log('⚠️ Error en auto-fill:', e);
+            }
+          };
+          
+          // Ejecutar auto-fill con múltiples delays
+          setTimeout(autoFill, 1000);
+          setTimeout(autoFill, 2000);
+          setTimeout(autoFill, 3000);
         }
       } catch (e) {
         show('Error inicializando Square: ' + (e.message || e), false);
