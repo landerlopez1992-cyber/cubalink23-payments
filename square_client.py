@@ -48,7 +48,11 @@ def create_payment_with_card(customer_id:str, card_id:str, amount_cents:int, cur
         "customer_id": customer_id,
         "source_id": card_id,  # ✅ CORREGIDO: usar source_id para Card on File
         "location_id": loc,
-        "note": note
+        "note": note,
+        # ✅ AGREGAR ZIP CODE por defecto para sandbox
+        "billing_address": {
+            "postal_code": "12345"  # ZIP code por defecto para sandbox
+        }
     }
     r = requests.post(f"{base}/v2/payments", headers=_headers(token), json=body, timeout=30)
     if r.status_code != 200:
@@ -63,7 +67,11 @@ def create_payment_with_nonce(nonce:str, amount_cents:int, currency="USD", note=
         "source_id": nonce,
         "location_id": loc,
         "customer_id": customer_id,
-        "note": note
+        "note": note,
+        # ✅ AGREGAR ZIP CODE por defecto para sandbox
+        "billing_address": {
+            "postal_code": "12345"  # ZIP code por defecto para sandbox
+        }
     }
     r = requests.post(f"{base}/v2/payments", headers=_headers(token), json=body, timeout=30)
     if r.status_code != 200:
