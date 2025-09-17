@@ -46,7 +46,7 @@ def create_payment_with_card(customer_id:str, card_id:str, amount_cents:int, cur
         "idempotency_key": str(uuid.uuid4()),
         "amount_money": {"amount": amount_cents, "currency": currency},
         "customer_id": customer_id,
-        "card_id": card_id,
+        "source_id": card_id,  # ✅ CORREGIDO: usar source_id para Card on File
         "location_id": loc,
         "note": note
     }
