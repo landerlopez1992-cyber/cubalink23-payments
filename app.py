@@ -32,6 +32,10 @@ print(f"🔑 Square App ID: {'✅ Configurada' if SQUARE_APPLICATION_ID else '�
 print(f"🔑 Square Access Token: {'✅ Configurada' if SQUARE_ACCESS_TOKEN else '❌ No configurada'}")
 print(f"🔑 Square Location ID: {'✅ Configurada' if SQUARE_LOCATION_ID else '❌ No configurada'}")
 print(f"🌍 Entorno: {SQUARE_ENVIRONMENT.upper()}")
+print(f"🔍 DEBUG - App ID: {SQUARE_APPLICATION_ID}")
+print(f"🔍 DEBUG - Access Token: {SQUARE_ACCESS_TOKEN[:10]}..." if SQUARE_ACCESS_TOKEN else "🔍 DEBUG - Access Token: None")
+print(f"🔍 DEBUG - Location ID: {SQUARE_LOCATION_ID}")
+print(f"🔍 DEBUG - Environment: {SQUARE_ENVIRONMENT}")
 
 # Inicializar cliente Square
 square_client = None
