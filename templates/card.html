@@ -28,7 +28,7 @@
   const currency = qs.get('currency') || 'USD';
   const note = qs.get('note') || 'CubaLink23';
   const customerId = qs.get('customer_id'); // para save
-  const applicationId = 'sandbox-sq0idb-IsIJtKqx2OHdVJjYmg6puA';
+  const applicationId = 'sandbox-sq0idb-IsIJtKqx2OHdVJjYmg6puA'; // Si falla, verificar en Square Dashboard
   const locationId = 'LZVTP0YQ9YQBB';
 
   function postToApp(data){
@@ -54,9 +54,19 @@
   }
   console.log('✅ Square SDK cargado correctamente');
 
-  const payments = window.Square.payments(applicationId, locationId);
-  const card = await payments.card();
-  await card.attach('#card-container');
+  try {
+    console.log('🔧 Inicializando Square Payments...');
+    const payments = window.Square.payments(applicationId, locationId);
+    console.log('💳 Creando card element...');
+    const card = await payments.card();
+    console.log('🔗 Attachando card al DOM...');
+    await card.attach('#card-container');
+    console.log('✅ Card element listo');
+  } catch (e) {
+    console.error('❌ Error inicializando Square:', e);
+    document.getElementById('msg').textContent = 'Error: ' + e.message;
+    return;
+  }
 
   async function tokenize(){ 
     const { status, nonce, errors } = await card.tokenize();
