@@ -21,8 +21,19 @@
 </head>
 <body>
   <div class="card">
-    <h1>🔒 Pago Final</h1>
-    <p style="color: #6b7280; margin: 0 0 16px;">Confirma tu método de pago</p>
+    <h1>🔒 Agregar Tarjeta</h1>
+    <p style="color: #6b7280; margin: 0 0 16px;">Completa la información de tu tarjeta</p>
+    
+    <!-- ✅ CAMPOS ADICIONALES ANTES DE SQUARE -->
+    <div style="margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">👤 Nombre del titular:</label>
+      <input type="text" id="cardholder-name" placeholder="Ej: Juan Pérez" 
+             style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 16px;">
+      
+      <label style="display: block; margin: 16px 0 8px; font-weight: 600;">📮 Código postal:</label>
+      <input type="text" id="postal-code" placeholder="Ej: 12345" maxlength="10"
+             style="width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 16px;">
+    </div>
     
     <!-- Formulario Square -->
     <div id="card-container"></div>
@@ -369,16 +380,23 @@
         // ✅ NUEVO: Crear tarjeta EN Square y guardar metadata en Supabase
         if (customerId) {
           try {
+            // ✅ Obtener datos del formulario
+            const cardholderName = document.getElementById('cardholder-name').value || 'Usuario';
+            const postalCode = document.getElementById('postal-code').value || '12345';
+            
             console.log('💾 Guardando nueva tarjeta para customer:', customerId);
+            console.log('👤 Nombre:', cardholderName);
+            console.log('📮 Código postal:', postalCode);
+            
             const createRes = await fetch('/api/cards/create', {
               method: 'POST',
               headers: {'Content-Type':'application/json'},
               body: JSON.stringify({
                 user_id: customerId,
-                customer_id: customerId, // Asumimos que customer_id = user_id por ahora
+                customer_id: customerId,
                 nonce: nonce,
-                postal_code: '12345',
-                name: 'Usuario'
+                postal_code: postalCode,
+                name: cardholderName
               })
             });
             
