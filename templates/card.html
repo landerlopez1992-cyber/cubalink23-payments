@@ -106,7 +106,17 @@
           };
         } else {
           // Error de Square (declined, etc.)
-          const errorData = data.message ? JSON.parse(data.message) : data;
+          let errorData = data;
+          try {
+            // Intentar parsear message si es string JSON
+            if (data.message && typeof data.message === 'string') {
+              errorData = JSON.parse(data.message);
+            }
+          } catch (e) {
+            // Si no es JSON válido, usar data original
+            errorData = data;
+          }
+          
           payment = errorData.payment;
           status = payment?.status || 'FAILED';
           result = {
