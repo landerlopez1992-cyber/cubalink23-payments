@@ -168,7 +168,22 @@ def charge_card_on_file():
         card_id = data["card_id"]
         note = data.get("note", "")
         
-        # ✅ Usar función existente
+        # ✅ Obtener ZIP code de Supabase para la tarjeta
+        try:
+            # Llamar al backend system para obtener info de la tarjeta
+            card_response = requests.get(
+                f"https://cubalink23-system.onrender.com/api/users/{customer_id}/cards/{card_id}",
+                timeout=5
+            )
+            zip_code = "12345"  # Por defecto
+            if card_response.status_code == 200:
+                card_data = card_response.json()
+                zip_code = card_data.get("zip_code", "12345")
+                print(f"📮 ZIP code obtenido: {zip_code}")
+        except:
+            zip_code = "12345"  # Fallback
+        
+        # ✅ Usar función existente con ZIP code
         payment = create_payment_with_card(customer_id, card_id, amount, currency, note)
         
         if "error" in payment:
