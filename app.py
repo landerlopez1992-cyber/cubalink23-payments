@@ -211,5 +211,40 @@ def charge_card_on_file():
             "square": {"error": str(e)}
         }), 500
 
+@app.route("/api/cards/create", methods=["POST"])
+def create_card():
+    """Crear tarjeta EN Square y devolver card.id real"""
+    try:
+        data = request.get_json(force=True)
+        print(f"🔥 CREAR TARJETA EN SQUARE: {data}")
+        
+        nonce = data["nonce"]
+        customer_id = data["customer_id"]
+        name = data.get("name", "")
+        zip_code = data.get("zip", "12345")
+        
+        # ✅ Crear tarjeta EN Square usando función existente
+        card = create_card_on_file(customer_id, nonce)
+        
+        if "error" in card:
+            return jsonify({
+                "ok": False,
+                "square": card["error"]
+            }), card.get("status_code", 400)
+        
+        # ✅ Devolver card.id REAL de Square
+        return jsonify({
+            "ok": True,
+            "square_card_id": card["id"],  # Este es el ccof:... real
+            "card": card
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error creando tarjeta: {e}")
+        return jsonify({
+            "ok": False,
+            "square": {"error": str(e)}
+        }), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
