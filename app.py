@@ -26,7 +26,7 @@ SQUARE_ACCESS_TOKEN = os.environ.get('SQUARE_ACCESS_TOKEN')
 SQUARE_LOCATION_ID = os.environ.get('SQUARE_LOCATION_ID')
 SQUARE_ENVIRONMENT = os.environ.get('SQUARE_ENVIRONMENT', 'sandbox')  # 'sandbox' o 'production'
 
-print("💳 CUBALINK23 PAYMENTS BACKEND - SOLO SQUARE v1.1")
+print("💳 CUBALINK23 PAYMENTS BACKEND - SOLO SQUARE v1.2")
 print(f"🔧 Puerto: {PORT}")
 print(f"🔑 Square App ID: {'✅ Configurada' if SQUARE_APPLICATION_ID else '❌ No configurada'}")
 print(f"🔑 Square Access Token: {'✅ Configurada' if SQUARE_ACCESS_TOKEN else '❌ No configurada'}")
