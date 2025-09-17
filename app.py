@@ -17,14 +17,25 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE") or os.getenv("SUPABASE_KEY")
 
 supabase: Client = None
+
+# 🔍 DEBUG: Mostrar exactamente qué variables tenemos
+print(f"🔍 DEBUG SUPABASE:")
+print(f"   SUPABASE_URL: {SUPABASE_URL}")
+print(f"   SUPABASE_SERVICE_KEY length: {len(SUPABASE_SERVICE_KEY) if SUPABASE_SERVICE_KEY else 'None'}")
+print(f"   SUPABASE_SERVICE_KEY starts with: {SUPABASE_SERVICE_KEY[:20] if SUPABASE_SERVICE_KEY else 'None'}...")
+
 try:
     if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        print(f"🔄 Intentando conectar a Supabase...")
         supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-        print(f"✅ Supabase conectado: {SUPABASE_URL[:50]}...")
+        print(f"✅ Supabase conectado exitosamente!")
     else:
-        print("⚠️ Supabase no configurado - algunos endpoints no funcionarán")
+        print("⚠️ Variables faltantes:")
+        print(f"   SUPABASE_URL: {'✅' if SUPABASE_URL else '❌'}")
+        print(f"   SUPABASE_SERVICE_KEY: {'✅' if SUPABASE_SERVICE_KEY else '❌'}")
 except Exception as e:
     print(f"❌ Error conectando Supabase: {e}")
+    print(f"❌ Tipo de error: {type(e)}")
     print("⚠️ Continuando sin Supabase - algunos endpoints no funcionarán")
     supabase = None
 
