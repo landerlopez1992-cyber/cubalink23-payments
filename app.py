@@ -73,6 +73,7 @@ def fail(code, msg, http=422):
 def api_payments():
     if (k := require_key()): return k
     data = request.get_json() or {}
+    print(f"🔥 DATOS RECIBIDOS: {data}")
     
     amount = data.get("amount_cents")
     currency = data.get("currency", "USD")
@@ -80,6 +81,10 @@ def api_payments():
     source_id = data.get("source_id") or data.get("nonce")
     customer_id = data.get("customer_id")
     card_id = data.get("card_id")
+    
+    print(f"🎯 SOURCE_ID: '{source_id}' (tipo: {type(source_id)})")
+    print(f"💰 AMOUNT: {amount}")
+    print(f"👤 CUSTOMER_ID: {customer_id}")
 
     # 🔒 Validación fuerte de nonce en SANDBOX
     if not source_id and not card_id:
