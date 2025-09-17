@@ -109,13 +109,6 @@ def process_payment():
             return jsonify({"error": "card_token y amount son requeridos"}), 400
 
         # Crear pago con Square
-        print(f"🔍 DEBUG - Cliente Square: {type(square_client)}")
-        print(f"🔍 DEBUG - Atributos del cliente: {dir(square_client)}")
-        
-        payments_api = square_client.payments_api
-        print(f"🔍 DEBUG - Payments API: {type(payments_api)}")
-        print(f"🔍 DEBUG - Métodos disponibles: {dir(payments_api)}")
-        
         body = {
             "source_id": card_token,
             "idempotency_key": idempotency_key,
@@ -128,7 +121,7 @@ def process_payment():
 
         print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
 
-        response = payments_api.create_payment(body)
+        response = square_client.payments.create_payment(body)
 
         if response.is_success():
             payment_data = response.body['payment']
