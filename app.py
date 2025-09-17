@@ -12,8 +12,7 @@ import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from square import Square
-from square.environment import SquareEnvironment
+from square.client import client
 
 app = Flask(__name__)
 CORS(app)
@@ -43,9 +42,9 @@ square_client = None
 if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
         # Usar la sintaxis correcta según la documentación oficial de Square
-        square_client = Square(
-            environment=SquareEnvironment.SANDBOX,
-            token=SQUARE_ACCESS_TOKEN
+        square_client = client(
+            access_token=SQUARE_ACCESS_TOKEN,
+            environment='sandbox'
         )
         print("✅ Cliente Square inicializado correctamente")
     except Exception as e:
