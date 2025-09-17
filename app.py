@@ -13,7 +13,6 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from square.client import Client
-from square.http.auth.o_auth_2 import BearerAuthCredentials
 
 app = Flask(__name__)
 CORS(app)
@@ -44,9 +43,7 @@ if SQUARE_APPLICATION_ID and SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID:
     try:
         # Usar la sintaxis correcta según la documentación oficial de Square
         square_client = Client(
-            bearer_auth_credentials=BearerAuthCredentials(
-                access_token=SQUARE_ACCESS_TOKEN
-            ),
+            access_token=SQUARE_ACCESS_TOKEN,
             environment=SQUARE_ENVIRONMENT
         )
         print("✅ Cliente Square inicializado correctamente")
