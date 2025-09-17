@@ -66,20 +66,67 @@ def api_cards_save():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+def fail(code, msg, http=422):
+    return jsonify({"status":"FAILED","code":code,"message":msg}), http
+
 @app.post("/api/payments")
 def api_payments():
     if (k := require_key()): return k
     data = request.get_json() or {}
-    amount = int(data["amount_cents"]); currency = data.get("currency", "USD"); note = data.get("note")
-    if "card_id" in data and "customer_id" in data:
-        p = create_payment_with_card(data["customer_id"], data["card_id"], amount, currency, note)
-        return jsonify(p), 200
-    if "nonce" in data:
-        p = create_payment_with_nonce(data["nonce"], amount, currency, note, customer_id=data.get("customer_id"))
+    
+    amount = data.get("amount_cents")
+    currency = data.get("currency", "USD")
+    note = data.get("note", "")
+    source_id = data.get("nonce") or data.get("source_id")
+    customer_id = data.get("customer_id")
+    card_id = data.get("card_id")
+
+    # 🔒 Validación fuerte de nonce en SANDBOX
+    if not source_id and not card_id:
+        return fail("MISSING_SOURCE", "source_id o card_id requerido")
+
+    if source_id:
+        if source_id == "[redacted]" or not source_id.startswith("cnon:"):
+            return fail("MISSING_NONCE", "Nonce inválido o placeholder")
+
+    if not amount or amount <= 0:
+        return fail("BAD_AMOUNT", "Monto inválido")
+
+    try:
+        # Dos modos: Card on File o Nonce directo
+        if card_id and customer_id:
+            p = create_payment_with_card(customer_id, card_id, amount, currency, note)
+        else:
+            p = create_payment_with_nonce(source_id, amount, currency, note, customer_id=customer_id)
+        
+        # Si hay error en la respuesta
         if "error" in p:
-            return jsonify(p), p.get("status_code", 400)
-        return jsonify(p), 200
-    return jsonify({"error":"Provide {customer_id,card_id} or {nonce}"}), 400
+            return jsonify({
+                "status": "FAILED",
+                "code": "SQUARE_ERROR",
+                "message": str(p["error"])
+            }), p.get("status_code", 400)
+        
+        # Verificar status del payment
+        status = p.get("status")
+        if status == "COMPLETED":
+            return jsonify({
+                "status": "COMPLETED",
+                "payment_id": p.get("id"),
+                "receipt_url": p.get("receipt_url"),
+                "amount": p.get("amount_money", {}).get("amount"),
+                "last4": p.get("card_details", {}).get("card", {}).get("last_4"),
+                "square_status": status
+            }), 200
+        else:
+            return jsonify({
+                "status": "FAILED", 
+                "code": "PAYMENT_NOT_COMPLETED",
+                "message": f"Payment status: {status}"
+            }), 400
+            
+    except Exception as e:
+        return fail("SERVER_ERROR", str(e), 500)
 
 @app.post("/api/payments/charge-onfile")
 def api_payments_charge_onfile():
