@@ -64,4 +64,7 @@ def create_payment_with_nonce(nonce:str, amount_cents:int, currency="USD", note=
         "note": note
     }
     r = requests.post(f"{base}/v2/payments", headers=_headers(token), json=body, timeout=30)
-    r.raise_for_status(); return r.json()["payment"]
+    if r.status_code != 200:
+        # Devolver el error de Square en lugar de hacer raise_for_status
+        return {"error": r.json() if r.content else {"message": "Payment failed"}, "status_code": r.status_code}
+    return r.json()["payment"]

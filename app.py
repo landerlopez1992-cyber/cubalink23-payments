@@ -44,6 +44,8 @@ def api_payments():
         return jsonify(p), 200
     if "nonce" in data:
         p = create_payment_with_nonce(data["nonce"], amount, currency, note, customer_id=data.get("customer_id"))
+        if "error" in p:
+            return jsonify(p), p.get("status_code", 400)
         return jsonify(p), 200
     return jsonify({"error":"Provide {customer_id,card_id} or {nonce}"}), 400
 
