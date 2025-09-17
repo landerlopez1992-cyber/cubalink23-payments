@@ -113,23 +113,8 @@ def api_payments():
                 "message": str(p["error"])
             }), p.get("status_code", 400)
         
-        # Verificar status del payment
-        status = p.get("status")
-        if status == "COMPLETED":
-            return jsonify({
-                "status": "COMPLETED",
-                "payment_id": p.get("id"),
-                "receipt_url": p.get("receipt_url"),
-                "amount": p.get("amount_money", {}).get("amount"),
-                "last4": p.get("card_details", {}).get("card", {}).get("last_4"),
-                "square_status": status
-            }), 200
-        else:
-            return jsonify({
-                "status": "FAILED", 
-                "code": "PAYMENT_NOT_COMPLETED",
-                "message": f"Payment status: {status}"
-            }), 400
+        # ✅ Devolver TODO el objeto payment de Square
+        return jsonify({"payment": p}), 200
             
     except Exception as e:
         return fail("SERVER_ERROR", str(e), 500)

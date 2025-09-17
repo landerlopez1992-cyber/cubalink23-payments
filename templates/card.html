@@ -1,109 +1,105 @@
 <!doctype html>
-<html><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>CubaLink23 – Pago</title>
-<script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
-<style>
-  body{margin:0;background:#f6f7fb;font-family:system-ui}
-  .wrap{max-width:420px;margin:20px auto;padding:16px}
-  .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 8px 26px rgba(0,0,0,.08)}
-  .btn{width:100%;padding:14px;border:0;border-radius:12px;background:#5a67d8;color:#fff;font-weight:700}
-  #msg{color:#666;margin:10px 0}
-</style>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Datos de tarjeta</title>
+  <style>
+    body { font-family: system-ui, Arial; margin: 0; background:#f7f7fb; }
+    .card { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.06); padding: 22px 22px 28px; }
+    h1 { font-size: 20px; margin: 0 0 18px; }
+    #card-container { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+    button { width: 100%; padding: 12px 14px; border:0; border-radius: 10px; cursor:pointer; margin-top: 16px; font-weight: 600; }
+    .primary { background:#4f46e5; color:#fff; }
+    .muted { color:#6b7280; font-size: 14px; margin-top:12px;}
+    .msg { margin-top: 14px; padding: 10px; border-radius: 8px; font-size: 14px; }
+    .ok { background:#ecfdf5; color:#065f46; border:1px solid #34d399; }
+    .err{ background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; white-space: pre-wrap;}
+  </style>
+  <!-- Web Payments SDK (SANDBOX) -->
+  <script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 </head>
 <body>
-<div class="wrap">
   <div class="card">
-    <h3 style="margin:0 0 12px">Datos de tarjeta</h3>
+    <h1>Datos de tarjeta</h1>
     <div id="card-container"></div>
-    <div id="msg"></div>
-    <button id="payBtn" class="btn">Continuar</button>
+    <button id="pay" class="primary">Continuar</button>
+    <div id="out" class="muted"></div>
+    <div id="msg" class="msg" style="display:none"></div>
   </div>
-</div>
-<script>
-(async () => {
-  const qs = new URLSearchParams(location.search);
-  const mode = qs.get('mode') || 'save'; // 'save'|'pay'
-  const amount = Number(qs.get('amount') || 100);
-  const currency = qs.get('currency') || 'USD';
-  const note = qs.get('note') || 'CubaLink23';
-  const customerId = qs.get('customer_id'); // para save
-  const applicationId = 'sandbox-sq0idb-IsIJtKqx2OHdVJjYmg6puA'; // Si falla, verificar en Square Dashboard
-  const locationId = 'LZVTP0YQ9YQBB';
 
-  function postToApp(data){
-    const payload = JSON.stringify({ type:'paymentResult', data });
-    window.ReactNativeWebView?.postMessage?.(payload);
-    window.flutter_inappwebview?.callHandler?.('paymentResult', data);
-    // Para Flutter WebView
-    if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
-      window.flutter_inappwebview.callHandler('paymentResult', data);
-    } else if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-      window.ReactNativeWebView.postMessage(payload);
-    } else {
-      // Fallback para otros WebViews
-      window.parent.postMessage(payload, '*');
-    }
-  }
+  <script>
+    // ✅ variables en scope global (evita "card is not defined")
+    let payments, card;
 
-  console.log('🔍 Verificando Square SDK...');
-  if(!window.Square){ 
-    console.error('❌ Square SDK no cargado');
-    document.getElementById('msg').textContent='Error: Square SDK no cargado'; 
-    return;
-  }
-  console.log('✅ Square SDK cargado correctamente');
+    const appId = "sandbox-sq0idb-IsIJtKqx2OHdVJjYmg6puA";            // sandbox app id
+    const locationId = "LZVTP0YQ9YQBB";  // sandbox location
 
-  let card; // ✅ Declarar card en scope global
-  
-  try {
-    console.log('🔧 Inicializando Square Payments...');
-    const payments = window.Square.payments(applicationId, locationId);
-    console.log('💳 Creando card element...');
-    card = await payments.card(); // ✅ Asignar sin const
-    console.log('🔗 Attachando card al DOM...');
-    await card.attach('#card-container');
-    console.log('✅ Card element listo');
-  } catch (e) {
-    console.error('❌ Error inicializando Square:', e);
-    document.getElementById('msg').textContent = 'Error: ' + e.message;
-    return;
-  }
+    // Monto/currency desde query (?amount=1574&currency=USD&note=...)
+    const params = new URLSearchParams(location.search);
+    const amount = parseInt(params.get("amount") || "100", 10);
+    const currency = (params.get("currency") || "USD").toUpperCase();
+    const note = params.get("note") || "Test payment";
 
-  async function tokenize(){ 
-    if (!card) throw new Error('Card element no inicializado');
-    const { status, nonce, errors } = await card.tokenize();
-    if(status!=='OK') throw new Error(errors?.[0]?.message||'Tokenización fallida');
-    return nonce;
-  }
-
-  document.getElementById('payBtn').onclick = async () => {
-    console.log('🚀 Botón de pago presionado');
-    const btn = document.getElementById('payBtn');
+    const out = document.getElementById('out');
     const msg = document.getElementById('msg');
-    btn.disabled=true; msg.textContent='Procesando…';
-    try {
-      console.log('🔄 Iniciando tokenización...');
-      const nonce = await tokenize();
-      console.log('✅ Nonce obtenido:', nonce);
-      let res;
-      if (mode==='save') {
-        res = await fetch('/api/cards/save',{method:'POST',headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ source_id: nonce, customer_id: customerId })});
-      } else {
-        res = await fetch('/api/payments',{method:'POST',headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ source_id: nonce, amount_cents: amount, currency: currency, note: note })});
-      }
-      const json = await res.json();
-      postToApp(json);
-      msg.textContent = (json.status==='COMPLETED' || json.card_id) ? 'Listo ✅' : ('Error ❌ ' + (json.code||''));      
-    } catch(e){
-      const err={status:'FAILED',code:'TOKENIZE_ERROR',message:e.message};
-      postToApp(err);
-      msg.textContent='Error: '+e.message;
-      btn.disabled=false;
+
+    function show(text, ok=false) {
+      msg.style.display = 'block';
+      msg.className = 'msg ' + (ok ? 'ok' : 'err');
+      msg.textContent = text;
     }
-  };
-})();
-</script>
-</body></html>
+
+    (async function init() {
+      try {
+        payments = window.Square.payments(appId, locationId); // ✅ inicialización oficial
+        card = await payments.card();
+        await card.attach('#card-container');
+        out.textContent = `Monto: ${amount} ${currency}`;
+      } catch (e) {
+        show('Error inicializando Square: ' + (e.message || e), false);
+      }
+    })();
+
+    async function tokenize() {
+      const result = await card.tokenize();
+      if (result.status === 'OK') return result.token;
+      // Muestra detalle de errores del SDK
+      const details = (result.errors || []).map(e => `${e.code}: ${e.message}`).join('\n');
+      throw new Error(details || 'Tokenization failed');
+    }
+
+    document.getElementById('pay').addEventListener('click', async () => {
+      msg.style.display = 'none';
+      try {
+        const nonce = await tokenize();
+
+        // ✅ Llama a tu backend Flask en Render
+        const res = await fetch('/api/payments', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            idempotency_key: crypto.randomUUID(),
+            amount_money: { amount, currency },
+            source_id: nonce,
+            location_id: locationId,
+            note
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(data, null, 2));
+
+        // Muestra estado real devuelto por Square a través del backend
+        const status = data?.payment?.status || 'UNKNOWN';
+        show(`Pago ${status}\n\n${JSON.stringify(data, null, 2)}`, status === 'COMPLETED');
+
+        // (Opcional) notificar a la app contenedora con postMessage
+        // window.ReactNativeWebView?.postMessage(JSON.stringify({type:'payment_result', data}));
+      } catch (err) {
+        show(String(err), false);
+      }
+    });
+  </script>
+</body>
+</html>
