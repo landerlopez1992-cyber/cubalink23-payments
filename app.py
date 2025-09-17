@@ -121,7 +121,7 @@ def process_payment():
 
         print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
 
-        response = square_client.payments.create_payment(body)
+        response = square_client.payments.create_payment(body=body)
 
         if response.is_success():
             payment_data = response.body['payment']
