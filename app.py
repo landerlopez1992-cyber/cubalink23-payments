@@ -13,7 +13,6 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from square.client import Client
-from square.models import CreatePaymentRequest, Money
 
 app = Flask(__name__)
 CORS(app)
@@ -127,21 +126,19 @@ def process_payment():
         except ValueError:
             return jsonify({"error": "Formato de fecha de vencimiento inválido. Use MM/YY"}), 400
 
-        # Crear pago con Square usando la sintaxis correcta según documentación oficial
-        amount_money = Money(
-            amount=int(float(amount) * 100),  # Convertir a centavos
-            currency=currency
-        )
-        
-        body = CreatePaymentRequest(
-            source_id="cnon:card-nonce-ok",  # Nonce de prueba de Square
-            idempotency_key=idempotency_key,
-            amount_money=amount_money
-        )
+        # Crear pago con Square usando datos de tarjeta
+        body = {
+            "source_id": "cnon:card-nonce-ok",  # Nonce de prueba de Square
+            "idempotency_key": idempotency_key,
+            "amount_money": {
+                "amount": int(float(amount) * 100),  # Convertir a centavos
+                "currency": currency
+            }
+        }
 
-        print(f"📤 Enviando a Square API: {amount} {currency} con idempotency {idempotency_key}")
+        print(f"📤 Enviando a Square API: {json.dumps(body, indent=2)}")
 
-        response = square_client.payments.create_payment(body)
+        response = square_client.payments.create_payment(body=body)
 
         if response.is_success():
             payment_data = response.body['payment']
