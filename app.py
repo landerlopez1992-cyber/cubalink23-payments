@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from square_client import (
     ensure_config_ok, create_customer, create_card_on_file,
-    create_payment_with_card, create_payment_with_nonce
+    create_payment_with_card, create_payment_with_nonce, _cfg
 )
 from supabase import create_client, Client
 
@@ -52,6 +52,69 @@ def health():
 @app.get("/__ping")
 def ping():
     return {"ok": True, "service": "payments"}, 200
+
+@app.post("/api/payment-links/create")
+def create_payment_link():
+    """Crear Payment Link de Square - SIMPLE Y DIRECTO"""
+    try:
+        data = request.get_json() or {}
+        amount_cents = int(data.get("amount", 100))
+        currency = data.get("currency", "USD")
+        note = data.get("note", "Recarga Cubalink23")
+        
+        # Crear Payment Link usando Square REST API
+        env, base, token, location_id = _cfg()
+        
+        body = {
+            "idempotency_key": str(uuid.uuid4()),
+            "quick_pay": {
+                "location_id": location_id,
+                "name": f"Recarga ${amount_cents/100:.2f}",
+                "price_money": {
+                    "amount": amount_cents,
+                    "currency": currency
+                }
+            },
+            "description": note,
+            "checkout_options": {
+                "redirect_url": "https://cubalink23-system.onrender.com/payment-success",
+                "ask_for_shipping_address": False
+            }
+        }
+        
+        response = requests.post(
+            f"{base}/v2/online-checkout/payment-links",
+            headers={
+                "Square-Version": "2024-08-21",
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json=body,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            payment_link = response.json()["payment_link"]
+            return jsonify({
+                "success": True,
+                "payment_link_id": payment_link["id"],
+                "payment_url": payment_link["url"],
+                "amount": amount_cents,
+                "currency": currency
+            }), 200
+        else:
+            error = response.json() if response.content else {"message": "Error creating payment link"}
+            return jsonify({
+                "success": False,
+                "error": error
+            }), response.status_code
+            
+    except Exception as e:
+        print(f"❌ Error creando payment link: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 @app.get("/debug/users")
 def debug_users():
