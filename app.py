@@ -49,6 +49,10 @@ def health():
     supabase_ready = supabase is not None
     return {"ok": True, "square_ready": ok, "supabase_ready": supabase_ready, **meta}
 
+@app.get("/__ping")
+def ping():
+    return {"ok": True, "service": "payments"}, 200
+
 @app.get("/debug/users")
 def debug_users():
     """TEMPORAL: Buscar usuarios en Supabase"""
