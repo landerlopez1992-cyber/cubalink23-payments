@@ -77,7 +77,7 @@ def create_payment_link():
             },
             "description": note,
             "checkout_options": {
-                "redirect_url": "https://cubalink23-system.onrender.com/payment-success",
+                "redirect_url": "cubalink23://payment-success",
                 "ask_for_shipping_address": False
             }
         }
